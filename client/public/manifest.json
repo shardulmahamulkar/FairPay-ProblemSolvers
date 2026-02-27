@@ -1,0 +1,10 @@
+{
+  "name": "FairPay",
+  "short_name": "FairPay",
+  "description": "Smart group expense splitting",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f8f8",
+  "theme_color": "#f8f8f8",
+  "icons": []
+}

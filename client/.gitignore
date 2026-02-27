@@ -1,0 +1,70 @@
+# ======================
+# Dependencies
+# ======================
+node_modules/
+.pnp
+.pnp.js
+
+# ======================
+# Build outputs
+# ======================
+dist/
+build/
+.next/
+out/
+.vercel/
+
+# ======================
+# Logs
+# ======================
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ======================
+# Environment variables
+# ======================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*
+
+# ======================
+# Firebase
+# ======================
+.firebase/
+firebase-debug.log
+firestore-debug.log
+
+# ======================
+# OS files
+# ======================
+.DS_Store
+Thumbs.db
+
+# ======================
+# IDE / Editor
+# ======================
+.vscode/
+.idea/
+*.swp
+
+# ======================
+# Testing
+# ======================
+coverage/
+
+# ======================
+# TypeScript
+# ======================
+*.tsbuildinfo
+
+# ======================
+# Misc
+# ======================
+*.pem
