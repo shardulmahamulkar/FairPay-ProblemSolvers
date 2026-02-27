@@ -8,7 +8,8 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { ApiService } from "@/services/ApiService";
 import { useToast } from "@/hooks/use-toast";
-import { getCategoryIcon } from "@/lib/categoryIcons";
+import { getCategoryIcon, getCategoryColor } from "@/lib/categoryIcons";
+import { getCurrencySymbol } from "@/lib/currency";
 import { ExpenseDetailsDialog } from "@/components/ExpenseDetailsDialog";
 import { useCurrency } from "@/contexts/CurrencyContext";
 
@@ -109,11 +110,11 @@ const ActivityPage = () => {
                 className="flex items-center justify-between p-3 rounded-xl border-0 shadow-sm cursor-pointer hover:bg-muted/30 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden p-1.5">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden p-1.5 ${getCategoryColor(exp.category, exp.expenseNote).bg}`}>
                     <img
                       src={getCategoryIcon(exp.category, exp.expenseNote)}
                       alt={exp.category || "expense"}
-                      className="w-full h-full object-contain"
+                      className="w-full h-full object-contain invert"
                     />
                   </div>
                   <div>

@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { getCategoryIcon, getCategoryName } from "@/lib/categoryIcons";
+import { getCategoryIcon, getCategoryName, getCategoryColor } from "@/lib/categoryIcons";
 import { getCurrencySymbol } from "@/lib/currency";
 import { Receipt, Calendar, CreditCard, Users, FileText } from "lucide-react";
 
@@ -26,11 +26,11 @@ export function ExpenseDetailsDialog({ expense, open, onOpenChange, getName }: E
                 </DialogHeader>
 
                 <div className="flex flex-col items-center gap-3 py-4">
-                    <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center overflow-hidden p-2">
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center overflow-hidden p-2 ${getCategoryColor(expense.category, expense.expenseNote).bg}`}>
                         <img
                             src={getCategoryIcon(expense.category, expense.expenseNote)}
                             alt={expense.category || "expense"}
-                            className="w-full h-full object-contain"
+                            className="w-full h-full object-contain invert"
                         />
                     </div>
                     <div className="text-center">
