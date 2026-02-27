@@ -7,12 +7,14 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useState } from "react";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 const currencies = ["INR", "USD", "EUR", "GBP"];
 
 const SettingsPage = () => {
   const navigate = useNavigate();
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const { defaultCurrency, setDefaultCurrency } = useCurrency();
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -26,7 +28,7 @@ const SettingsPage = () => {
       <Card className="p-5 rounded-2xl border-0 shadow-md space-y-4">
         <div className="space-y-2">
           <Label>Default Currency</Label>
-          <Select defaultValue="INR">
+          <Select value={defaultCurrency} onValueChange={setDefaultCurrency}>
             <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
             <SelectContent>{currencies.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
           </Select>

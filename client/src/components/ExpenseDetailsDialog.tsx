@@ -30,7 +30,7 @@ export function ExpenseDetailsDialog({ expense, open, onOpenChange, getName }: E
                         <img
                             src={getCategoryIcon(expense.category, expense.expenseNote)}
                             alt={expense.category || "expense"}
-                            className="w-full h-full object-contain invert"
+                            className="w-full h-full object-contain filter invert"
                         />
                     </div>
                     <div className="text-center">

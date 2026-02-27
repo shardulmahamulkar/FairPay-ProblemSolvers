@@ -26,14 +26,18 @@ const NewExpensePage = () => {
   const { user } = useAuth();
   const [groups, setGroups] = useState<any[]>([]);
   const [step, setStep] = useState(1);
+  const searchParams = new URLSearchParams(location.search);
+  const initialAmount = searchParams.get('amount') || "";
+  const initialNote = searchParams.get('note') || "";
+
   const [form, setForm] = useState({
     groupId: (location.state as any)?.groupId || "",
     date: new Date().toISOString().split("T")[0],
-    amount: "",
+    amount: initialAmount,
     currency: "INR",
     splitType: "equal",
     category: "",
-    note: "",
+    note: initialNote,
     paymentType: "upi",
   });
   const [customMode, setCustomMode] = useState<"amount" | "percentage">("amount");

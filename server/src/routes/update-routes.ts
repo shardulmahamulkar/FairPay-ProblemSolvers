@@ -26,7 +26,7 @@ updateRoutes.get("/check", (req, res) => {
         res.json({
             version: metadata.version,
             // Provide the direct public URL to the zip bundle we will statically serve
-            url: `${process.env.PURL || 'http://localhost:3000'}/updates/dist.zip`
+            url: `${process.env.VITE_API_URL || 'http://localhost:3000'}/updates/dist.zip`
         });
 
     } catch (error) {

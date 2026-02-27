@@ -11,6 +11,7 @@ import { getCategoryIcon, getCategoryColor } from "@/lib/categoryIcons";
 import { getCurrencySymbol } from "@/lib/currency";
 import { convertAllToBase } from "@/services/exchangeRate";
 import { ExpenseDetailsDialog } from "@/components/ExpenseDetailsDialog";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 const speedTiles = [
   { icon: Plus, label: "New Expense", path: "/expenses/new" },
@@ -29,6 +30,7 @@ const HomePage = () => {
   const [friendBalances, setFriendBalances] = useState<Record<string, number>>({});
   const [userAvatars, setUserAvatars] = useState<Record<string, string>>({});
   const [userNames, setUserNames] = useState<Record<string, string>>({});
+  const { defaultCurrency, formatAmount } = useCurrency();
 
   useEffect(() => {
     if (!user?.id) return;
@@ -65,12 +67,14 @@ const HomePage = () => {
         const owedDocs = res.owedDocs || [];
         const receivableDocs = res.receivableDocs || [];
 
-        // Convert each debt to INR
+        // Convert each debt to defaultCurrency
         const convertedOwed = await convertAllToBase(
-          owedDocs.map((d: any) => ({ amount: d.amount, currency: d.currency || "INR" }))
+          owedDocs.map((d: any) => ({ amount: d.amount, currency: d.currency || "INR" })),
+          defaultCurrency
         );
         const convertedReceivable = await convertAllToBase(
-          receivableDocs.map((d: any) => ({ amount: d.amount, currency: d.currency || "INR" }))
+          receivableDocs.map((d: any) => ({ amount: d.amount, currency: d.currency || "INR" })),
+          defaultCurrency
         );
 
         const totalOwed = convertedOwed.reduce((sum, d) => sum + d.convertedAmount, 0);
@@ -101,7 +105,7 @@ const HomePage = () => {
     ApiService.get(`/api/friends/user/${user.id}`)
       .then((res: any) => setFriends((res || []).slice(0, 5)))
       .catch(console.error);
-  }, [user]);
+  }, [user, defaultCurrency]);
 
   const activeGroups = groups.filter(g => !g.isArchived);
 
@@ -114,6 +118,24 @@ const HomePage = () => {
 
   return (
     <div className="space-y-6 animate-fade-in pt-4">
+      {/* Soft nudge for missing UPI ID */}
+      {user && !user.upiId && (
+        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 p-3 rounded-[20px] shadow-sm flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+              <span className="text-amber-600 dark:text-amber-400 font-bold text-xs">UPI</span>
+            </div>
+            <div>
+              <p className="text-[14px] font-bold text-amber-800 dark:text-amber-500 leading-tight">Update your UPI ID</p>
+              <p className="text-[12px] text-amber-700 dark:text-amber-500/80 leading-snug">Add it so friends can pay you easily.</p>
+            </div>
+          </div>
+          <Button onClick={() => navigate("/profile")} className="bg-amber-500 hover:bg-amber-600 text-white dark:bg-amber-500/20 dark:hover:bg-amber-500/30 dark:text-amber-400 h-8 text-xs font-bold rounded-xl px-4">
+            Update
+          </Button>
+        </div>
+      )}
+
       {/* Summary Card — always premium dark navy, intentional premium widget */}
       <Card className="p-6 border-0 rounded-[32px] relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0F1A2E 0%, #1E2A44 100%)", boxShadow: "0px 20px 48px rgba(15, 26, 46, 0.28)" }}>
         <div className="flex items-center gap-5">
@@ -134,12 +156,12 @@ const HomePage = () => {
           <div className="flex-1 flex flex-col gap-3">
             <div className="pl-3" style={{ borderLeft: "2px solid #C6A75E" }}>
               <span className="text-white/50 text-[11px] font-medium block mb-1">To Pay</span>
-              <AnimatedCounter value={summary.totalOwed} prefix={getCurrencySymbol()} className="text-white text-[20px] font-bold leading-none tracking-tight" />
+              <AnimatedCounter value={summary.totalOwed} prefix={getCurrencySymbol(defaultCurrency)} className="text-white text-[20px] font-bold leading-none tracking-tight" />
             </div>
             <div style={{ height: "1px", backgroundColor: "rgba(255,255,255,0.07)" }} />
             <div className="pl-3" style={{ borderLeft: "2px solid #C6A75E" }}>
               <span className="text-white/50 text-[11px] font-medium block mb-1">To Receive</span>
-              <AnimatedCounter value={summary.totalReceivable} prefix={getCurrencySymbol()} className="text-white text-[20px] font-bold leading-none tracking-tight" />
+              <AnimatedCounter value={summary.totalReceivable} prefix={getCurrencySymbol(defaultCurrency)} className="text-white text-[20px] font-bold leading-none tracking-tight" />
             </div>
           </div>
         </div>
@@ -243,7 +265,7 @@ const HomePage = () => {
                   <span className="text-[13px] text-foreground font-medium text-center leading-tight w-16 truncate mt-1">{name}</span>
                   {convertedBal !== 0 && (
                     <span className={cn("text-[12px] font-bold", convertedBal > 0 ? "text-receive" : "text-owed")}>
-                      {convertedBal > 0 ? "+" : ""}{getCurrencySymbol()}{Math.abs(Math.round(convertedBal * 100) / 100)}
+                      {convertedBal > 0 ? "+" : ""}{getCurrencySymbol(defaultCurrency)}{Math.abs(Math.round(convertedBal * 100) / 100)}
                     </span>
                   )}
                 </div>
@@ -285,7 +307,7 @@ const HomePage = () => {
                       <img
                         src={getCategoryIcon(exp.category, exp.expenseNote)}
                         alt={exp.category || "expense"}
-                        className="w-full h-full object-contain drop-shadow-sm invert"
+                        className="w-full h-full object-contain filter invert"
                       />
                     </div>
                     <div className="flex flex-col justify-center gap-1 mt-0.5">
@@ -294,7 +316,7 @@ const HomePage = () => {
                     </div>
                   </div>
                   <p className="text-[16px] font-semibold text-foreground tracking-tight">
-                    {getCurrencySymbol(exp.currency)}{Number(exp.amount).toFixed(2)}
+                    {formatAmount(exp.amount, exp.currency)}
                   </p>
                 </div>
               );

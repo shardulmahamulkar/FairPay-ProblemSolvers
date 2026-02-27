@@ -16,7 +16,9 @@ import {
   Banknote,
   Smartphone,
   Clock,
+  Download,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -62,7 +64,8 @@ import { ApiService } from "@/services/ApiService";
 import { useAuth } from "@/contexts/AuthContext";
 import { getCategoryIcon, getCategoryColor } from "@/lib/categoryIcons";
 import { ExpenseDetailsDialog } from "@/components/ExpenseDetailsDialog";
-import { getCurrencySymbol } from "@/lib/currency";
+import { useCurrency } from "@/contexts/CurrencyContext";
+import { convertAllToBase } from "@/services/exchangeRate";
 
 /* ── Stats tab mock data & helpers ── */
 /* ── Stats tab helpers ── */
@@ -99,12 +102,13 @@ function useInView(threshold = 0.2) {
 }
 
 function StatTooltip({ active, payload, label }: any) {
+  const { formatAmount } = useCurrency();
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-xl bg-card/95 border border-border px-3 py-2 shadow-lg">
       <p className="text-[10px] text-muted-foreground mb-0.5">{label}</p>
       <p className="text-sm font-semibold text-foreground">
-        ₹{payload[0].value}
+        {formatAmount(payload[0].value)}
       </p>
     </div>
   );
@@ -112,6 +116,7 @@ function StatTooltip({ active, payload, label }: any) {
 
 function DonutCenter({ viewBox, total }: any) {
   const { cx, cy } = viewBox;
+  const { formatAmount } = useCurrency();
   return (
     <g>
       <text
@@ -131,7 +136,7 @@ function DonutCenter({ viewBox, total }: any) {
         fontSize={13}
         fontWeight={700}
       >
-        ₹{total.toLocaleString("en-IN")}
+        {formatAmount(total)}
       </text>
     </g>
   );
@@ -171,11 +176,12 @@ function StatsDashboard({
     budget > 0 ? Math.min(Math.round((spent / budget) * 100), 100) : 0;
   const totalSpent = categoryData.reduce((s, c) => s + c.value, 0);
 
+  const { formatAmount } = useCurrency();
   const overviewCards = [
     {
       title: "Total Spent",
-      value: `₹${spent.toLocaleString("en-IN")}`,
-      subtitle: `₹${Math.round(spent / Math.max(memberData.length, 1)).toLocaleString("en-IN")} per person`,
+      value: formatAmount(spent),
+      subtitle: `${formatAmount(Math.round(spent / Math.max(memberData.length, 1)))} per person`,
     },
     {
       title: "Budget Used",
@@ -185,12 +191,12 @@ function StatsDashboard({
     },
     {
       title: "Daily Average",
-      value: `₹${Math.round(spent / Math.max(timelineData.length, 1)).toLocaleString("en-IN")}`,
+      value: formatAmount(Math.round(spent / Math.max(timelineData.length, 1))),
       subtitle: `Last ${timelineData.length} entries`,
     },
     {
       title: "Projected Spend",
-      value: `₹${Math.round((spent / Math.max(timelineData.length, 1)) * 30).toLocaleString("en-IN")}`,
+      value: formatAmount(Math.round((spent / Math.max(timelineData.length, 1)) * 30)),
       subtitle: "Estimated monthly",
     },
   ];
@@ -342,7 +348,7 @@ function StatsDashboard({
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-medium text-foreground">
-                          ₹{cat.value.toLocaleString()}
+                          {formatAmount(cat.value)}
                         </span>
                         <span className="text-[10px] text-muted-foreground w-6 text-right">
                           {pct}%
@@ -387,7 +393,7 @@ function StatsDashboard({
                     }}
                     axisLine={false}
                     tickLine={false}
-                    tickFormatter={(v: number) => `₹${v}`}
+                    tickFormatter={(v: number) => formatAmount(v)}
                   />
                   <RechartsTooltip content={<StatTooltip />} cursor={false} />
                   <Line
@@ -620,6 +626,7 @@ const GroupDetailPage = () => {
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "upi" | null>(null);
   const [pendingSettleIds, setPendingSettleIds] = useState<Set<string>>(new Set());
   const [selectedExpense, setSelectedExpense] = useState<any | null>(null);
+  const { defaultCurrency, formatAmount, convertAmount } = useCurrency();
 
   // Resolve user IDs to display names
   const getName = (userId: string) => {
@@ -666,6 +673,7 @@ const GroupDetailPage = () => {
         allUserIds.add(b.payeeId);
       });
 
+      // Resolving member names...
       const nameMap: Record<string, string> = {};
       await Promise.all(
         [...allUserIds].map(async (uid) => {
@@ -683,6 +691,45 @@ const GroupDetailPage = () => {
         }),
       );
       setUserNames(nameMap);
+
+      // Convert currencies
+      let expensesArr = (expensesRes as any[]) || [];
+      let balancesArr = (balancesRes as any[]) || [];
+
+      const convertedExpenses = await convertAllToBase(
+        expensesArr.map(e => ({ amount: e.amount, currency: e.currency || "INR" })),
+        defaultCurrency
+      );
+      for (let i = 0; i < expensesArr.length; i++) {
+        const originalCurrency = expensesArr[i].currency || "INR";
+        expensesArr[i].amount = convertedExpenses[i].convertedAmount;
+        if (expensesArr[i].participatorsInvolved) {
+          for (let j = 0; j < expensesArr[i].participatorsInvolved.length; j++) {
+            expensesArr[i].participatorsInvolved[j].amount = convertAmount(expensesArr[i].participatorsInvolved[j].amount, originalCurrency);
+            expensesArr[i].participatorsInvolved[j].currency = defaultCurrency;
+          }
+        }
+        expensesArr[i].currency = defaultCurrency;
+      }
+
+      const convertedBalances = await convertAllToBase(
+        balancesArr.map(b => ({ amount: b.amount, currency: b.currency || "INR" })),
+        defaultCurrency
+      );
+      for (let i = 0; i < balancesArr.length; i++) {
+        balancesArr[i].amount = convertedBalances[i].convertedAmount;
+        balancesArr[i].currency = defaultCurrency;
+      }
+
+      setExpenses(expensesArr);
+      setBalances(balancesArr);
+
+      // Re-calculate spent to match converted amounts
+      if (statsRes) {
+        (statsRes as any).spent = expensesArr.reduce((sum, e) => sum + e.amount, 0);
+      }
+      setStats(statsRes);
+
     } catch (err) {
       console.error(err);
     } finally {
@@ -692,7 +739,7 @@ const GroupDetailPage = () => {
 
   useEffect(() => {
     fetchData();
-  }, [id]);
+  }, [id, defaultCurrency]);
 
   // Fetch friends for adding members
   useEffect(() => {
@@ -718,6 +765,91 @@ const GroupDetailPage = () => {
         title: "Error",
         description: err.message,
       });
+    }
+  };
+
+  const handleExportExcel = () => {
+    if (!group) {
+      toast({ title: "No data to export", description: "Group data is missing.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const wb = XLSX.utils.book_new();
+
+      // 1. Summary Sheet
+      const summaryData = [{
+        "Group Name": group.groupName,
+        "Description": group.description || "N/A",
+        "Type": group.groupType,
+        "Created At": new Date(group.createdAt).toLocaleString(),
+        "Budget": stats?.budget || 0,
+        "Total Spent": stats?.spent || 0,
+        "Member Count": group.members?.length || 0,
+        "Is Archived": group.isArchived ? "Yes" : "No"
+      }];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryData), "Summary");
+
+      // 2. Members Sheet
+      const membersData = (group.members || []).map((m: any) => ({
+        "Name": getName(m.userId),
+        "User ID": m.userId,
+        "Joined At": new Date(m.addedAt).toLocaleDateString(),
+        "Role": m.userId === group.createdBy ? "Admin" : "Member"
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(membersData), "Members");
+
+      // 3. Expenses Sheet
+      if (expenses.length > 0) {
+        const expensesData = expenses.map(exp => ({
+          "Expense ID": exp._id,
+          "Date": new Date(exp.expenseTime).toLocaleString(),
+          "Description": exp.expenseNote || "Untitled",
+          "Category": exp.category || "Other",
+          "Paid By": getName(exp.userId),
+          "Amount": exp.amount,
+          "Currency": exp.currency || "INR",
+          "Payment Method": exp.paymentMethod || "N/A",
+          "Bill Photo URL": exp.billPhoto || "None"
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(expensesData), "Expenses");
+
+        // 4. Splits Sheet
+        const splitsData: any[] = [];
+        expenses.forEach(exp => {
+          if (exp.participatorsInvolved && Array.isArray(exp.participatorsInvolved)) {
+            exp.participatorsInvolved.forEach((split: any) => {
+              splitsData.push({
+                "Expense Description": exp.expenseNote || "Untitled",
+                "Expense Date": new Date(exp.expenseTime).toLocaleDateString(),
+                "Member": getName(split.userId),
+                "Amount Owed": split.amount,
+                "Percentage": split.splitPercentage ? `${split.splitPercentage}%` : "N/A"
+              });
+            });
+          }
+        });
+        if (splitsData.length > 0) {
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(splitsData), "Expense Splits");
+        }
+      }
+
+      // 5. Unsettled Balances Sheet
+      if (balances.length > 0) {
+        const balancesData = balances.map(b => ({
+          "Who Owes": getName(b.payerId),
+          "To Whom": getName(b.payeeId),
+          "Amount": b.amount,
+          "Status": "Unsettled"
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(balancesData), "Balances");
+      }
+
+      const safeName = group.groupName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
+      XLSX.writeFile(wb, `${safeName}_full_export.xlsx`);
+      toast({ title: "Export Successful", description: "Full group database exported to Excel." });
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Export Failed", description: err.message });
     }
   };
 
@@ -792,7 +924,7 @@ const GroupDetailPage = () => {
       setBudgetOpen(false);
       toast({
         title: "Budget Set",
-        description: `Budget set to ₹${newBudget}`,
+        description: `Budget set to ${formatAmount(parseFloat(newBudget) || 0)}`,
       });
     } catch (err: any) {
       toast({
@@ -835,6 +967,7 @@ const GroupDetailPage = () => {
         expenseNote: editExpenseForm.expenseNote,
         amount: parseFloat(editExpenseForm.amount),
         category: editExpenseForm.category,
+        currency: defaultCurrency,
       });
       setEditExpense(null);
       toast({ title: "Expense Updated" });
@@ -973,6 +1106,11 @@ const GroupDetailPage = () => {
               Set Budget
             </DropdownMenuItem>
             <DropdownMenuItem
+              onClick={handleExportExcel}
+            >
+              <Download className="w-4 h-4 mr-2" /> Export to Excel
+            </DropdownMenuItem>
+            <DropdownMenuItem
               className="text-owed"
               onClick={() => setEndGroupOpen(true)}
             >
@@ -1050,7 +1188,7 @@ const GroupDetailPage = () => {
                   <img
                     src={getCategoryIcon(exp.category, exp.expenseNote)}
                     alt={exp.category || "expense"}
-                    className="w-full h-full object-contain invert"
+                    className="w-full h-full object-contain filter invert"
                   />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -1066,7 +1204,7 @@ const GroupDetailPage = () => {
                 </div>
                 <div className="flex items-center gap-1 ml-2 flex-shrink-0">
                   <span className="font-semibold text-sm text-foreground">
-                    {getCurrencySymbol(exp.currency)}{exp.amount?.toLocaleString()}
+                    {formatAmount(exp.amount, exp.currency)}
                   </span>
                   {exp.status !== "settled" && (
                     <button
@@ -1134,7 +1272,7 @@ const GroupDetailPage = () => {
                       b.payerId === user?.id ? "text-owed" : "text-receive",
                     )}
                   >
-                    {getCurrencySymbol()}{b.amount?.toLocaleString()}
+                    {formatAmount(b.amount, defaultCurrency)}
                   </span>
                 </div>
                 <div className="flex gap-2">
@@ -1517,7 +1655,7 @@ const GroupDetailPage = () => {
             </DialogTitle>
             <DialogDescription>
               Send a settlement request for{" "}
-              <strong>{getCurrencySymbol()}{settleBalance?.amount?.toLocaleString()}</strong>? The
+              <strong>{formatAmount(settleBalance?.amount, defaultCurrency)}</strong>? The
               other party will receive a notification to confirm in Activity
               page.
             </DialogDescription>
@@ -1571,7 +1709,7 @@ const GroupDetailPage = () => {
               <Flag className="w-5 h-5 text-owed" /> File Dispute
             </DialogTitle>
             <DialogDescription>
-              Current: {getCurrencySymbol()}{disputeBalance?.amount?.toLocaleString()}
+              Current: {formatAmount(disputeBalance?.amount, defaultCurrency)}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -1591,7 +1729,7 @@ const GroupDetailPage = () => {
             </div>
             <div>
               <Label className="text-xs text-muted-foreground mb-1 block">
-                Proposed Amount ({getCurrencySymbol()})
+                Proposed Amount
               </Label>
               <Input
                 type="number"

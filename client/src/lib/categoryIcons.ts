@@ -1,11 +1,11 @@
 import Accommodation from "@/assets/Accomodation.svg";
 import Beverages from "@/assets/Beverages.svg";
-import Entertainment from "@/assets/Entertainment.png";
+import Entertainment from "@/assets/Entertainment.svg";
 import Other from "@/assets/Other.svg";
 import Shopping from "@/assets/Shopping.png";
-import Travel from "@/assets/Travel.png";
+import Travel from "@/assets/Transport.svg";
 import Utilities from "@/assets/Utilities.png";
-import Food from "@/assets/fast-food.png";
+import Food from "@/assets/Food.svg";
 
 const CATEGORY_ICONS: Record<string, string> = {
     // exact DB values (case-insensitive lookup done in helper)
@@ -57,7 +57,7 @@ export function getCategoryName(category?: string, note?: string): string {
 }
 
 /** Returns { bg, text } classes for each category — navy glassmorphism */
-const GLASS_BG = "bg-[#0f1c3f] border border-[#c9a84c]/40 shadow-[0_0_8px_rgba(201,168,76,0.2)]";
+const GLASS_BG = "bg-[#0f1c3f] border border-[#c9a84c]/80";
 const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
     food: { bg: GLASS_BG, text: "text-slate-700 dark:text-white" },
     transport: { bg: GLASS_BG, text: "text-slate-700 dark:text-white" },

@@ -28,6 +28,8 @@ const ProfilePage = () => {
   const [editName, setEditName] = useState(user?.name || "");
   const [editUsername, setEditUsername] = useState(user?.username || "");
   const [editAvatar, setEditAvatar] = useState(user?.avatar || "");
+  const [editUpiId, setEditUpiId] = useState(user?.upiId || "");
+  const [editConfirmUpiId, setEditConfirmUpiId] = useState(user?.upiId || "");
 
   const hasUnsettled = friends.some(f => f.owedAmount !== 0);
 
@@ -35,10 +37,16 @@ const ProfilePage = () => {
     setEditName(user?.name || "");
     setEditUsername(user?.username || "");
     setEditAvatar(user?.avatar || "");
+    setEditUpiId(user?.upiId || "");
+    setEditConfirmUpiId(user?.upiId || "");
     setEditOpen(true);
   };
 
   const handleSaveProfile = () => {
+    if (editUpiId !== editConfirmUpiId) {
+      toast({ title: "Validation Error", description: "UPI IDs do not match.", variant: "destructive" });
+      return;
+    }
     setEditOpen(false);
     setTwoFAOpen(true);
   };
@@ -48,6 +56,7 @@ const ProfilePage = () => {
       await updateProfile({
         name: editName,
         username: editUsername,
+        upiId: editUpiId.trim(),
         avatar: editAvatar.trim() || editName.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase(),
       });
       setTwoFAOpen(false);
@@ -87,6 +96,10 @@ const ProfilePage = () => {
         <div className="mt-4 space-y-2 text-left">
           <div className="flex items-center gap-3 text-sm text-white/80">
             <Mail className="w-4 h-4" /> {user?.email || "—"}
+          </div>
+          <div className="flex items-center gap-3 text-sm text-white/80">
+            <span className="font-bold border border-white/50 px-1 rounded text-xs">UPI</span>
+            {user?.upiId || <span className="text-white/50 italic cursor-pointer underline" onClick={openEdit}>Add UPI ID</span>}
           </div>
         </div>
       </Card>
@@ -132,6 +145,13 @@ const ProfilePage = () => {
           <div className="space-y-3">
             <div className="space-y-1"><Label>Name</Label><Input value={editName} onChange={e => setEditName(e.target.value)} className="rounded-xl" /></div>
             <div className="space-y-1"><Label>Username</Label><Input value={editUsername} onChange={e => setEditUsername(e.target.value)} className="rounded-xl" /></div>
+            <div className="space-y-1"><Label>UPI ID</Label><Input value={editUpiId} onChange={e => setEditUpiId(e.target.value)} placeholder="e.g. name@bank" className="rounded-xl" /></div>
+            {editUpiId !== (user?.upiId || "") && (
+              <div className="space-y-1">
+                <Label className={editUpiId !== editConfirmUpiId ? "text-destructive" : ""}>Confirm UPI ID</Label>
+                <Input value={editConfirmUpiId} onChange={e => setEditConfirmUpiId(e.target.value)} placeholder="Re-enter UPI ID" className="rounded-xl" />
+              </div>
+            )}
             <div className="space-y-1">
               <Label>Profile Picture</Label>
               <div className="flex flex-col items-center gap-3">
@@ -219,7 +239,15 @@ const ProfilePage = () => {
                     await logout();
                     navigate("/onboarding");
                   } catch (e: any) {
-                    toast({ title: "Delete failed", description: e.message || "Please re-login and try again.", variant: "destructive" });
+                    if (e.code === 'auth/requires-recent-login' || (e.message || "").includes('requires-recent-login')) {
+                      toast({
+                        title: "Re-authentication required",
+                        description: "For security, you must log out and log back in right before deleting your account.",
+                        variant: "destructive"
+                      });
+                    } else {
+                      toast({ title: "Delete failed", description: e.message || "Please re-login and try again.", variant: "destructive" });
+                    }
                   }
                 }}
                 className="rounded-xl"
