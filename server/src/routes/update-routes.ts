@@ -26,7 +26,7 @@ updateRoutes.get("/check", (req, res) => {
         res.json({
             version: metadata.version,
             // Provide the direct public URL to the zip bundle we will statically serve
-            url: `https://fairpay-r2ev.onrender.com/updates/dist.zip`
+            url: `https://fairpay-problemsolvers.onrender.com/updates/dist.zip`
         });
 
     } catch (error) {
