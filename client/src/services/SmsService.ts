@@ -97,10 +97,10 @@ export const SmsService = {
                     actionTypeId: "",
                     extra: {
                         amount: amount,
-                        note: payee ?\`Payment to \${payee}\` : "UPI Payment"
-          }
-        }
-      ]
-    });
-  }
+                        note: payee ? `Payment to ${payee}` : "UPI Payment"
+                    }
+                }
+            ]
+        });
+    }
 };
