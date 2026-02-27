@@ -72,7 +72,7 @@ const ProfilePage = () => {
 
   return (
     <div className="space-y-5 animate-fade-in pt-4">
-      <Card className="p-6 rounded-2xl border-0 shadow-md text-center" style={{ background: "linear-gradient(135deg, #4398BA, #C3F0F7)" }}>
+      <Card className="p-6 rounded-2xl border-0 shadow-md text-center" style={{ background: "linear-gradient(135deg, #1E2A44, #3A4F6E)" }}>
         {(user?.avatar?.startsWith("http") || user?.avatar?.startsWith("data:")) ? (
           <img src={user.avatar} alt="Profile" className="w-20 h-20 rounded-full object-cover mx-auto mb-3 shadow-lg" />
         ) : (
@@ -99,7 +99,7 @@ const ProfilePage = () => {
             className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <item.icon className="w-4 h-4 text-muted-foreground" />
+              <item.icon className="w-4 h-4 text-[#C6A75E]" />
               <span className="text-sm font-medium text-foreground">{item.label}</span>
             </div>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
@@ -107,7 +107,7 @@ const ProfilePage = () => {
         ))}
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center gap-3">
-            <Moon className="w-4 h-4 text-muted-foreground" />
+            <Moon className="w-4 h-4 text-[#C6A75E]" />
             <span className="text-sm font-medium text-foreground">Dark Mode</span>
           </div>
           <Switch checked={darkMode} onCheckedChange={toggleDarkMode} />
@@ -116,7 +116,7 @@ const ProfilePage = () => {
 
       <Card className="rounded-2xl border-0 shadow-md overflow-hidden divide-y divide-border">
         <button onClick={handleLogout} className="w-full flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors">
-          <LogOut className="w-4 h-4 text-muted-foreground" />
+          <LogOut className="w-4 h-4 text-[#C6A75E]" />
           <span className="text-sm font-medium text-foreground">Logout</span>
         </button>
         <button onClick={() => setDeleteOpen(true)} className="w-full flex items-center gap-3 p-4 hover:bg-destructive/5 transition-colors">

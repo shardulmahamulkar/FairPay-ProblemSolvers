@@ -56,6 +56,27 @@ friendRoutes.post("/reject", async (req, res) => {
     }
 });
 
+// Get outgoing sent friend requests
+friendRoutes.get("/sent/:userId", async (req, res) => {
+    try {
+        const result = await FriendService.getSentRequests(req.params.userId);
+        res.json(result);
+    } catch (err: any) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
+// Cancel a sent friend request
+friendRoutes.post("/cancel", async (req, res) => {
+    try {
+        const { userId, recipientId } = req.body;
+        const result = await FriendService.cancelRequest(userId, recipientId);
+        res.json(result);
+    } catch (err: any) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
 // Update friend (nickname, display name)
 friendRoutes.put("/update", async (req, res) => {
     try {
