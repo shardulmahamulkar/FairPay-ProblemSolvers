@@ -122,8 +122,8 @@ const ActivityPage = () => {
                     </p>
                   </div>
                 </div>
-                <p className={cn("text-sm font-semibold", isMyExpense ? "text-receive" : "text-owed")}>
-                  {isMyExpense ? "+" : "-"}{getCurrencySymbol(exp.currency)}{exp.amount}
+                <p className="text-sm font-semibold text-foreground">
+                  {getCurrencySymbol(exp.currency)}{Number(exp.amount).toFixed(2)}
                 </p>
               </Card>
             );

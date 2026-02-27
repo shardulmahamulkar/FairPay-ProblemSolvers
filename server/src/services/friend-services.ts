@@ -138,4 +138,27 @@ export class FriendService {
         await Friend.deleteOne({ userId, friendId });
         await Friend.deleteOne({ userId: friendId, friendId: userId });
     }
+
+    // Get outgoing sent friend requests (pending)
+    static async getSentRequests(userId: string) {
+        const requests = await Friend.find({ userId, status: "pending" });
+        return Promise.all(requests.map(async (r) => {
+            const recipient = await User.findOne({ authId: r.friendId });
+            return {
+                _id: r._id,
+                recipientId: r.friendId,
+                username: recipient?.displayName || recipient?.username || r.friendId.substring(0, 8),
+                email: recipient?.email || "",
+                avatar: recipient?.avatar || "",
+                createdAt: r.createdAt,
+            };
+        }));
+    }
+
+    // Cancel a sent friend request
+    static async cancelRequest(userId: string, recipientId: string) {
+        const result = await Friend.deleteOne({ userId, friendId: recipientId, status: "pending" });
+        if (result.deletedCount === 0) throw new Error("No pending request found to cancel");
+        return { success: true };
+    }
 }

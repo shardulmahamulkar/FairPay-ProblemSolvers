@@ -114,6 +114,24 @@ const HomePage = () => {
 
   return (
     <div className="space-y-6 animate-fade-in pt-4">
+      {/* Soft nudge for missing UPI ID */}
+      {user && !user.upiId && (
+        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 p-3 rounded-[20px] shadow-sm flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+              <span className="text-amber-600 dark:text-amber-400 font-bold text-xs">UPI</span>
+            </div>
+            <div>
+              <p className="text-[14px] font-bold text-amber-800 dark:text-amber-500 leading-tight">Update your UPI ID</p>
+              <p className="text-[12px] text-amber-700 dark:text-amber-500/80 leading-snug">Add it so friends can pay you easily.</p>
+            </div>
+          </div>
+          <Button onClick={() => navigate("/profile")} className="bg-amber-500 hover:bg-amber-600 text-white dark:bg-amber-500/20 dark:hover:bg-amber-500/30 dark:text-amber-400 h-8 text-xs font-bold rounded-xl px-4">
+            Update
+          </Button>
+        </div>
+      )}
+
       {/* Summary Card — always premium dark navy, intentional premium widget */}
       <Card className="p-6 border-0 rounded-[32px] relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0F1A2E 0%, #1E2A44 100%)", boxShadow: "0px 20px 48px rgba(15, 26, 46, 0.28)" }}>
         <div className="flex items-center gap-5">
@@ -127,7 +145,7 @@ const HomePage = () => {
               <Plus className="w-5 h-5 text-[#C6A75E]" strokeWidth={2.5} />
               Add Expense
             </button>
-            <p className="text-white/40 text-[12px] leading-snug">Track &amp; split<br/>shared expenses.</p>
+            <p className="text-white/40 text-[12px] leading-snug">Track &amp; split<br />shared expenses.</p>
           </div>
 
           {/* Right: Balance stats */}
@@ -253,7 +271,6 @@ const HomePage = () => {
         </section>
       )}
 
-      {/* Recent Expenses */}
       {/* Transactions */}
       <section>
         <Card className="pt-6 pb-4 px-6 rounded-[32px] border-0 shadow-sm bg-card">
@@ -278,7 +295,7 @@ const HomePage = () => {
                   onClick={() => setSelectedExpense(exp)}
                   className={cn(
                     "flex items-center justify-between py-[18px] cursor-pointer hover:bg-muted/30 transition-colors",
-                    index !== recentExpenses.length - 1 ? "border-b border-[rgba(15,26,46,0.08)]" : ""
+                    index !== recentExpenses.length - 1 ? "border-b border-border" : ""
                   )}
                 >
                   <div className="flex items-center gap-3">
@@ -289,7 +306,6 @@ const HomePage = () => {
                         className="w-full h-full object-contain drop-shadow-sm"
                       />
                     </div>
-                    {/* Vertically centered text container */}
                     <div className="flex flex-col justify-center gap-1 mt-0.5">
                       <p className="text-[16px] font-medium text-foreground leading-none tracking-tight">{exp.expenseNote || "Transaction"}</p>
                       <p className="text-[14px] text-muted-foreground leading-none tracking-tight">{groupName}</p>

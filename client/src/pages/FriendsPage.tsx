@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, MoreVertical, UserPlus, Send, Edit, X } from "lucide-react";
+import { Plus, Search, MoreVertical, UserPlus, Send, Edit, X, Clock } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ const FriendsPage = () => {
   const [search, setSearch] = useState("");
   const [friends, setFriends] = useState<any[]>([]);
   const [friendRequests, setFriendRequests] = useState<any[]>([]);
+  const [sentRequests, setSentRequests] = useState<any[]>([]);
   const [friendBalances, setFriendBalances] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
@@ -49,6 +50,13 @@ const FriendsPage = () => {
       setFriendRequests(reqRes as any[] || []);
     } catch (err) {
       console.warn("Requests fetch error (may not be deployed yet):", err);
+    }
+    // Fetch outgoing sent requests
+    try {
+      const sentRes = await ApiService.get(`/api/friends/sent/${user.id}`);
+      setSentRequests(sentRes as any[] || []);
+    } catch (err) {
+      console.warn("Sent requests fetch error:", err);
     }
     // Fetch summary to compute converted per-friend balances
     try {
@@ -122,6 +130,16 @@ const FriendsPage = () => {
     try {
       await ApiService.post("/api/friends/reject", { userId: user?.id, senderId });
       toast({ title: "Declined", description: "Friend request declined." });
+      fetchFriends();
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Error", description: err.message });
+    }
+  };
+
+  const handleCancelRequest = async (recipientId: string) => {
+    try {
+      await ApiService.post("/api/friends/cancel", { userId: user?.id, recipientId });
+      toast({ title: "Cancelled", description: "Friend request cancelled." });
       fetchFriends();
     } catch (err: any) {
       toast({ variant: "destructive", title: "Error", description: err.message });
@@ -276,6 +294,37 @@ const FriendsPage = () => {
           </p>
         )}
       </div>
+
+      {/* Sent Pending Requests */}
+      {sentRequests.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Clock className="w-4 h-4 text-muted-foreground" />
+            Pending Sent Requests
+            <span className="bg-muted text-muted-foreground text-[10px] font-bold rounded-full px-1.5 py-0.5">{sentRequests.length}</span>
+          </h3>
+          {sentRequests.map((req) => (
+            <Card key={req._id} className="flex items-center justify-between p-3 rounded-xl border-0 shadow-sm">
+              <div className="flex items-center gap-3">
+                {req.avatar?.startsWith("http") ? (
+                  <img src={req.avatar} alt={req.username} className="w-10 h-10 rounded-full object-cover" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                    {(req.username || "??").substring(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm font-medium text-foreground">{req.username || req.recipientId.substring(0, 8)}</p>
+                  <p className="text-xs text-muted-foreground">{req.email}</p>
+                </div>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => handleCancelRequest(req.recipientId)} className="rounded-xl h-8 px-3 text-xs text-owed border-owed/30">
+                Cancel
+              </Button>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Modify Friend Dialog */}
       <Dialog open={modifyOpen} onOpenChange={setModifyOpen}>

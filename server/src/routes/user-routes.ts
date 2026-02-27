@@ -7,7 +7,7 @@ export const userRoutes = Router();
 // Called on every login from the frontend
 userRoutes.post("/sync", async (req, res) => {
     try {
-        const { authId, username, email, phone, avatar, displayName } = req.body;
+        const { authId, username, email, phone, avatar, displayName, upiId } = req.body;
         if (!authId) return res.status(400).json({ error: "authId is required" });
 
         const user = await User.findOneAndUpdate(
@@ -19,6 +19,7 @@ userRoutes.post("/sync", async (req, res) => {
                     email: email || "",
                     phone: phone || "",
                     avatar: avatar || "",
+                    ...(upiId !== undefined && { upiId }),
                 },
             },
             { upsert: true, new: true }

@@ -16,7 +16,9 @@ import {
   Banknote,
   Smartphone,
   Clock,
+  Download,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -721,6 +723,91 @@ const GroupDetailPage = () => {
     }
   };
 
+  const handleExportExcel = () => {
+    if (!group) {
+      toast({ title: "No data to export", description: "Group data is missing.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const wb = XLSX.utils.book_new();
+
+      // 1. Summary Sheet
+      const summaryData = [{
+        "Group Name": group.groupName,
+        "Description": group.description || "N/A",
+        "Type": group.groupType,
+        "Created At": new Date(group.createdAt).toLocaleString(),
+        "Budget": stats?.budget || 0,
+        "Total Spent": stats?.spent || 0,
+        "Member Count": group.members?.length || 0,
+        "Is Archived": group.isArchived ? "Yes" : "No"
+      }];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryData), "Summary");
+
+      // 2. Members Sheet
+      const membersData = (group.members || []).map((m: any) => ({
+        "Name": getName(m.userId),
+        "User ID": m.userId,
+        "Joined At": new Date(m.addedAt).toLocaleDateString(),
+        "Role": m.userId === group.createdBy ? "Admin" : "Member"
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(membersData), "Members");
+
+      // 3. Expenses Sheet
+      if (expenses.length > 0) {
+        const expensesData = expenses.map(exp => ({
+          "Expense ID": exp._id,
+          "Date": new Date(exp.expenseTime).toLocaleString(),
+          "Description": exp.expenseNote || "Untitled",
+          "Category": exp.category || "Other",
+          "Paid By": getName(exp.userId),
+          "Amount": exp.amount,
+          "Currency": exp.currency || "INR",
+          "Payment Method": exp.paymentMethod || "N/A",
+          "Bill Photo URL": exp.billPhoto || "None"
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(expensesData), "Expenses");
+
+        // 4. Splits Sheet
+        const splitsData: any[] = [];
+        expenses.forEach(exp => {
+          if (exp.participatorsInvolved && Array.isArray(exp.participatorsInvolved)) {
+            exp.participatorsInvolved.forEach((split: any) => {
+              splitsData.push({
+                "Expense Description": exp.expenseNote || "Untitled",
+                "Expense Date": new Date(exp.expenseTime).toLocaleDateString(),
+                "Member": getName(split.userId),
+                "Amount Owed": split.amount,
+                "Percentage": split.splitPercentage ? `${split.splitPercentage}%` : "N/A"
+              });
+            });
+          }
+        });
+        if (splitsData.length > 0) {
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(splitsData), "Expense Splits");
+        }
+      }
+
+      // 5. Unsettled Balances Sheet
+      if (balances.length > 0) {
+        const balancesData = balances.map(b => ({
+          "Who Owes": getName(b.payerId),
+          "To Whom": getName(b.payeeId),
+          "Amount": b.amount,
+          "Status": "Unsettled"
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(balancesData), "Balances");
+      }
+
+      const safeName = group.groupName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
+      XLSX.writeFile(wb, `${safeName}_full_export.xlsx`);
+      toast({ title: "Export Successful", description: "Full group database exported to Excel." });
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Export Failed", description: err.message });
+    }
+  };
+
   if (loading)
     return <p className="p-4 text-muted-foreground">Loading group data...</p>;
   if (!group)
@@ -971,6 +1058,11 @@ const GroupDetailPage = () => {
               }}
             >
               Set Budget
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={handleExportExcel}
+            >
+              <Download className="w-4 h-4 mr-2" /> Export to Excel
             </DropdownMenuItem>
             <DropdownMenuItem
               className="text-owed"

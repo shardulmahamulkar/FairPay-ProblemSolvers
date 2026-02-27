@@ -61,5 +61,6 @@ export interface AuthUser {
   email: string;
   phone: string;
   avatar: string;
+  upiId?: string;
   isAuthenticated: boolean;
 }

@@ -36,6 +36,11 @@ const userSchema = new Schema(
     avatar: {
       type: String,
     },
+
+    upiId: {
+      type: String,
+      default: "",
+    },
   },
   { timestamps: true }
 );
