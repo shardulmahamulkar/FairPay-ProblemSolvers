@@ -27,15 +27,17 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     const convertAmount = (amount: number, fromCurrency?: string) => {
+        const val = amount || 0;
         const from = fromCurrency || "INR";
-        if (from === defaultCurrency) return amount;
+        if (from === defaultCurrency) return val;
         // Base is USD
-        if (!exchangeRates[from] || !exchangeRates[defaultCurrency]) return amount;
-        return (amount / exchangeRates[from]) * exchangeRates[defaultCurrency];
+        if (!exchangeRates[from] || !exchangeRates[defaultCurrency]) return val;
+        return (val / exchangeRates[from]) * exchangeRates[defaultCurrency];
     };
 
     const formatAmount = (amount: number, fromCurrency?: string) => {
-        const converted = convertAmount(amount, fromCurrency);
+        const val = amount || 0;
+        const converted = convertAmount(val, fromCurrency);
         const symbols: Record<string, string> = { INR: "₹", USD: "$", EUR: "€", GBP: "£" };
         const sym = symbols[defaultCurrency] || defaultCurrency + " ";
         return `${sym}${converted.toFixed(2)}`;
