@@ -254,7 +254,7 @@ const SettleHubPage = () => {
           </div>
         </button>
 
-        {isExpanded && group.items.length > 1 && (
+        {isExpanded && isOwed && group.items.length > 1 && (
           <div className="px-4 pb-2">
             <Button
               size="sm"
@@ -278,27 +278,37 @@ const SettleHubPage = () => {
                     </p>
                   </div>
                   <div className="flex gap-1.5">
-                    {pendingSettleIds.has(String(d._id)) ? (
-                      <span className="h-7 px-2.5 text-xs rounded-xl bg-muted text-muted-foreground inline-flex items-center gap-1 font-medium">
-                        <Clock className="w-3 h-3" /> Pending
-                      </span>
+                    {isOwed ? (
+                      /* User OWES — show Settle + Dispute */
+                      <>
+                        {pendingSettleIds.has(String(d._id)) ? (
+                          <span className="h-7 px-2.5 text-xs rounded-xl bg-muted text-muted-foreground inline-flex items-center gap-1 font-medium">
+                            <Clock className="w-3 h-3" /> Pending
+                          </span>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="h-7 px-2.5 text-xs rounded-xl bg-receive hover:bg-receive/90 text-white"
+                            onClick={() => setSettleTarget(d)}
+                          >
+                            <Check className="w-3 h-3 mr-1" /> Settle
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2.5 text-xs rounded-xl text-owed border-owed/30"
+                          onClick={() => { setDisputeTarget(d); setDisputeForm({ reason: "", proposedAmount: String(d.amount) }); }}
+                        >
+                          <Flag className="w-3 h-3 mr-1" /> Dispute
+                        </Button>
+                      </>
                     ) : (
-                      <Button
-                        size="sm"
-                        className="h-7 px-2.5 text-xs rounded-xl bg-receive hover:bg-receive/90 text-white"
-                        onClick={() => setSettleTarget(d)}
-                      >
-                        <Check className="w-3 h-3 mr-1" /> Settle
-                      </Button>
+                      /* User IS OWED — show status badge only */
+                      <span className="h-7 px-2.5 text-xs rounded-xl bg-muted text-muted-foreground inline-flex items-center gap-1 font-medium">
+                        <Clock className="w-3 h-3" /> Awaiting
+                      </span>
                     )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 px-2.5 text-xs rounded-xl text-owed border-owed/30"
-                      onClick={() => { setDisputeTarget(d); setDisputeForm({ reason: "", proposedAmount: String(d.amount) }); }}
-                    >
-                      <Flag className="w-3 h-3 mr-1" /> Dispute
-                    </Button>
                   </div>
                 </div>
               </div>

@@ -1101,73 +1101,178 @@ const GroupDetailPage = () => {
           />
         </TabsContent>
 
-        {/* Balances Tab — filtered to current user only */}
+        {/* Balances Tab — grouped by person, per-record actions + consolidated settle */}
         <TabsContent value="balances" className="space-y-3 mt-4">
-          {balances.filter(
-            (b) => b.payerId === user?.id || b.payeeId === user?.id,
-          ).length === 0 && (
-              <div className="text-center py-8">
-                <p className="text-sm text-muted-foreground">
-                  🎉 All settled! No pending balances involving you.
-                </p>
-              </div>
-            )}
-          {balances
-            .filter((b) => b.payerId === user?.id || b.payeeId === user?.id)
-            .map((b) => (
-              <Card
-                key={b._id}
-                className="p-4 rounded-xl border-0 shadow-sm space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">
-                      {getName(b.payerId)} owes → {getName(b.payeeId)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Pending settlement
-                    </p>
-                  </div>
-                  <span
-                    className={cn(
-                      "font-semibold text-lg",
-                      b.payerId === user?.id ? "text-owed" : "text-receive",
+          {(() => {
+            // 1. Filter to only pending balances involving current user
+            const myBalances = balances.filter(
+              (b) => (b.payerId === user?.id || b.payeeId === user?.id) && b.status === "pending"
+            );
+
+            // 2. Group by counterparty person
+            const personMap: Record<string, {
+              personId: string;
+              youOweRecords: any[];   // user is payerId → user owes this person
+              theyOweRecords: any[];  // user is payeeId → person owes user
+            }> = {};
+
+            myBalances.forEach((b) => {
+              const counterpartyId = b.payerId === user?.id ? b.payeeId : b.payerId;
+              if (!personMap[counterpartyId]) {
+                personMap[counterpartyId] = { personId: counterpartyId, youOweRecords: [], theyOweRecords: [] };
+              }
+              if (b.payerId === user?.id) {
+                personMap[counterpartyId].youOweRecords.push(b);
+              } else {
+                personMap[counterpartyId].theyOweRecords.push(b);
+              }
+            });
+
+            const personGroups = Object.values(personMap);
+
+            if (personGroups.length === 0) {
+              return (
+                <div className="text-center py-8">
+                  <p className="text-sm text-muted-foreground">🎉 All settled! No pending balances involving you.</p>
+                </div>
+              );
+            }
+
+            // Helper: find expense title for a given (payerId, payeeId) pair
+            const getExpenseLabel = (ownerUserId: string, participantUserId: string) => {
+              const match = expenses.find(exp =>
+                exp.userId === ownerUserId &&
+                exp.participatorsInvolved?.some((p: any) => p.userId === participantUserId)
+              );
+              return match?.expenseNote || null;
+            };
+
+            return personGroups.map(({ personId, youOweRecords, theyOweRecords }) => {
+              const totalYouOwe = youOweRecords.reduce((s, b) => s + (b.amount || 0), 0);
+              const totalTheyOwe = theyOweRecords.reduce((s, b) => s + (b.amount || 0), 0);
+              const netBalance = totalTheyOwe - totalYouOwe;
+
+              if (netBalance === 0 && youOweRecords.length === 0 && theyOweRecords.length === 0) return null;
+
+              const youOweNet = totalYouOwe > totalTheyOwe;
+              const allYouOweHavePending = youOweRecords.every(b => pendingSettleIds.has(String(b._id)));
+
+              return (
+                <Card key={personId} className="p-4 rounded-xl border-0 shadow-sm space-y-3">
+                  {/* Person header */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{getName(personId)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {youOweRecords.length + theyOweRecords.length} balance{(youOweRecords.length + theyOweRecords.length) !== 1 ? "s" : ""}
+                        {totalYouOwe > 0 && totalTheyOwe > 0 && ` · net ${Math.abs(netBalance) === 0 ? "even" : youOweNet ? "you owe" : "they owe"}`}
+                      </p>
+                    </div>
+                    {totalYouOwe > 0 && (
+                      <span className="font-semibold text-lg text-owed">
+                        −{getCurrencySymbol()}{totalYouOwe.toLocaleString()}
+                      </span>
                     )}
-                  >
-                    {getCurrencySymbol()}{b.amount?.toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  {pendingSettleIds.has(String(b._id)) ? (
-                    <span className="flex-1 rounded-xl bg-muted text-muted-foreground inline-flex items-center justify-center gap-1 text-sm font-medium py-2">
-                      <Clock className="w-3.5 h-3.5" /> Pending
-                    </span>
-                  ) : (
-                    <Button
-                      size="sm"
-                      className="flex-1 rounded-xl bg-receive hover:bg-receive/90 text-white"
-                      onClick={() => setSettleBalance(b)}
-                    >
-                      <Check className="w-3.5 h-3.5 mr-1" /> Settle
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1 rounded-xl text-owed border-owed/30"
-                    onClick={() => {
-                      setDisputeBalance(b);
-                      setDisputeForm({
-                        reason: "",
-                        proposedAmount: String(b.amount),
-                      });
-                    }}
-                  >
-                    <Flag className="w-3.5 h-3.5 mr-1" /> Dispute
-                  </Button>
-                </div>
-              </Card>
-            ))}
+                    {totalTheyOwe > 0 && totalYouOwe === 0 && (
+                      <span className="font-semibold text-lg text-receive">
+                        +{getCurrencySymbol()}{totalTheyOwe.toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Records where user OWES — show Settle + Dispute per record */}
+                  {youOweRecords.map((b) => {
+                    const label = getExpenseLabel(personId, user?.id || "") || `You owe ${getName(personId)}`;
+                    const hasPending = pendingSettleIds.has(String(b._id));
+                    return (
+                      <div key={b._id} className="space-y-2 pt-2 border-t border-border/30">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-foreground truncate max-w-[200px]">{label}</span>
+                          <span className="text-sm font-semibold text-owed">
+                            {getCurrencySymbol()}{b.amount?.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          {hasPending ? (
+                            <span className="flex-1 rounded-xl bg-muted text-muted-foreground inline-flex items-center justify-center gap-1 text-xs font-medium py-1.5">
+                              <Clock className="w-3 h-3" /> Pending
+                            </span>
+                          ) : (
+                            <Button
+                              size="sm"
+                              className="flex-1 rounded-xl h-8 text-xs bg-receive hover:bg-receive/90 text-white"
+                              onClick={() => setSettleBalance(b)}
+                            >
+                              <Check className="w-3 h-3 mr-1" /> Settle
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 rounded-xl h-8 text-xs text-owed border-owed/30"
+                            onClick={() => {
+                              setDisputeBalance(b);
+                              setDisputeForm({ reason: "", proposedAmount: String(b.amount) });
+                            }}
+                          >
+                            <Flag className="w-3 h-3 mr-1" /> Dispute
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Records where they OWE user — show Awaiting status per record */}
+                  {theyOweRecords.map((b) => {
+                    const label = getExpenseLabel(user?.id || "", personId) || `${getName(personId)} owes you`;
+                    return (
+                      <div key={b._id} className="space-y-2 pt-2 border-t border-border/30">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-foreground truncate max-w-[200px]">{label}</span>
+                          <span className="text-sm font-semibold text-receive">
+                            +{getCurrencySymbol()}{b.amount?.toLocaleString()}
+                          </span>
+                        </div>
+                        <span className="w-full rounded-xl bg-muted text-muted-foreground inline-flex items-center justify-center gap-1 text-xs font-medium py-1.5">
+                          <Clock className="w-3 h-3" /> Awaiting Payment
+                        </span>
+                      </div>
+                    );
+                  })}
+
+                  {/* Net summary row — always shown at bottom of every person card */}
+                  <div className="pt-2 border-t border-border/40">
+                    {netBalance < 0 && !allYouOweHavePending ? (
+                      /* Net Settle button — total you owe this person (net) */
+                      <Button
+                        size="sm"
+                        className="w-full rounded-xl h-9 bg-receive hover:bg-receive/90 text-white"
+                        onClick={() => {
+                          const primary = youOweRecords.sort((a, b) => b.amount - a.amount)[0];
+                          setSettleBalance({ ...primary, amount: Math.abs(netBalance) });
+                        }}
+                      >
+                        <Check className="w-3.5 h-3.5 mr-1.5" />
+                        Net Settle — {getCurrencySymbol()}{Math.abs(netBalance).toLocaleString()}
+                      </Button>
+                    ) : netBalance < 0 && allYouOweHavePending ? (
+                      /* All already pending */
+                      <span className="w-full rounded-xl bg-muted text-muted-foreground inline-flex items-center justify-center gap-1.5 text-sm font-medium py-2.5">
+                        <Clock className="w-3.5 h-3.5" />
+                        Net Pending — {getCurrencySymbol()}{Math.abs(netBalance).toLocaleString()}
+                      </span>
+                    ) : netBalance > 0 ? (
+                      /* Net Awaiting badge — total they owe you (net) */
+                      <span className="w-full rounded-xl bg-receive/10 text-receive inline-flex items-center justify-center gap-1.5 text-sm font-medium py-2.5">
+                        <Clock className="w-3.5 h-3.5" />
+                        Net Awaiting — {getCurrencySymbol()}{netBalance.toLocaleString()}
+                      </span>
+                    ) : null}
+                  </div>
+                </Card>
+              );
+            });
+          })()}
         </TabsContent>
 
 
