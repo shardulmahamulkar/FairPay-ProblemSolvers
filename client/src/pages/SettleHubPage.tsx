@@ -462,7 +462,7 @@ const SettleHubPage = () => {
               />
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Proposed Amount ({getCurrencySymbol()})</Label>
+              <Label className="text-xs text-muted-foreground mb-1 block">Proposed Amount ({{ INR: "₹", USD: "$", EUR: "€", GBP: "£" }[defaultCurrency] || defaultCurrency})</Label>
               <Input
                 type="number"
                 value={disputeForm.proposedAmount}
