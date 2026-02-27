@@ -14,7 +14,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+        sans: ['"Urbanist"', 'sans-serif'],
       },
       fontSize: {
         xs: ["13px", "18px"],
