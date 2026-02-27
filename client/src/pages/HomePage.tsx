@@ -13,10 +13,10 @@ import { convertAllToBase } from "@/services/exchangeRate";
 import { ExpenseDetailsDialog } from "@/components/ExpenseDetailsDialog";
 
 const speedTiles = [
-  { icon: Plus, label: "New Expense", path: "/expenses/new", color: "bg-primary" },
-  { icon: Users, label: "New Group", path: "/groups/new", color: "bg-receive" },
-  { icon: ArrowRightLeft, label: "Settle", path: "/settle", color: "bg-owed" },
-  { icon: Receipt, label: "Activity", path: "/activity", color: "bg-primary" },
+  { icon: Plus, label: "New Expense", path: "/expenses/new" },
+  { icon: Users, label: "New Group", path: "/groups/new" },
+  { icon: ArrowRightLeft, label: "Settle", path: "/settle" },
+  { icon: Receipt, label: "Activity", path: "/activity" },
 ];
 
 const HomePage = () => {
@@ -132,45 +132,32 @@ const HomePage = () => {
         </div>
       )}
 
-      {/* Summary Card */}
-      <Card className="p-5 border-0 shadow-sm rounded-[28px] relative overflow-hidden bg-[#CFE3E7] dark:bg-[#111c2a]">
-        <div className="flex items-center gap-4">
-          {/* Left Column */}
-          <div className="flex-[1.2] flex flex-col justify-center items-center gap-4">
-            <Button
+      {/* Summary Card — always premium dark navy, intentional premium widget */}
+      <Card className="p-6 border-0 rounded-[32px] relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0F1A2E 0%, #1E2A44 100%)", boxShadow: "0px 20px 48px rgba(15, 26, 46, 0.28)" }}>
+        <div className="flex items-center gap-5">
+          {/* Left: CTA + tagline */}
+          <div className="flex-[1.2] flex flex-col justify-center items-start gap-4">
+            <button
               onClick={() => navigate("/expenses/new")}
-              className="w-full bg-[#4194AD] dark:bg-[#327A91] text-white hover:bg-[#327A91] dark:hover:bg-[#20576a] rounded-full h-[46px] text-[15px] font-bold shadow-sm"
+              className="w-full rounded-[20px] h-[50px] text-[15px] font-bold transition-all flex items-center justify-center gap-2 text-white"
+              style={{ backgroundColor: "rgba(198,167,94,0.18)", border: "1px solid rgba(198,167,94,0.55)" }}
             >
-              <Plus className="w-5 h-5 mr-1" strokeWidth={2.5} /> Add New Expense
-            </Button>
-            <div className="text-center font-medium text-[#1E293B] dark:text-gray-300 leading-snug text-[13px]">
-              <p>Split bills, stay friends.</p>
-              <p>Stress-free group finance.</p>
-            </div>
+              <Plus className="w-5 h-5 text-[#C6A75E]" strokeWidth={2.5} />
+              Add Expense
+            </button>
+            <p className="text-white/40 text-[12px] leading-snug">Track &amp; split<br />shared expenses.</p>
           </div>
 
-          {/* Right Column */}
+          {/* Right: Balance stats */}
           <div className="flex-1 flex flex-col gap-3">
-            {/* To Pay */}
-            <div className="bg-white/60 dark:bg-white/10 backdrop-blur-xl rounded-[20px] p-3 flex items-center gap-3 border border-white/60 dark:border-white/10 shadow-sm">
-              <div className="w-9 h-9 rounded-full bg-[#F66363] flex items-center justify-center flex-shrink-0 shadow-sm">
-                <ArrowUpRight className="w-4 h-4 text-white" strokeWidth={2.5} />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[#64748B] dark:text-gray-400 text-[12px] font-medium leading-none mb-1.5">To Pay</span>
-                <AnimatedCounter value={summary.totalOwed} prefix={getCurrencySymbol()} className="text-[#0F172A] dark:text-gray-100 text-[16px] font-bold leading-none" />
-              </div>
+            <div className="pl-3" style={{ borderLeft: "2px solid #C6A75E" }}>
+              <span className="text-white/50 text-[11px] font-medium block mb-1">To Pay</span>
+              <AnimatedCounter value={summary.totalOwed} prefix={getCurrencySymbol()} className="text-white text-[20px] font-bold leading-none tracking-tight" />
             </div>
-
-            {/* To Receive */}
-            <div className="bg-white/60 dark:bg-white/10 backdrop-blur-xl rounded-[20px] p-3 flex items-center gap-3 border border-white/60 dark:border-white/10 shadow-sm">
-              <div className="w-9 h-9 rounded-full bg-[#4CAE4C] flex items-center justify-center flex-shrink-0 shadow-sm">
-                <ArrowDownLeft className="w-4 h-4 text-white" strokeWidth={2.5} />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[#64748B] dark:text-gray-400 text-[12px] font-medium leading-none mb-1.5">To Receive</span>
-                <AnimatedCounter value={summary.totalReceivable} prefix={getCurrencySymbol()} className="text-[#0F172A] dark:text-gray-100 text-[16px] font-bold leading-none" />
-              </div>
+            <div style={{ height: "1px", backgroundColor: "rgba(255,255,255,0.07)" }} />
+            <div className="pl-3" style={{ borderLeft: "2px solid #C6A75E" }}>
+              <span className="text-white/50 text-[11px] font-medium block mb-1">To Receive</span>
+              <AnimatedCounter value={summary.totalReceivable} prefix={getCurrencySymbol()} className="text-white text-[20px] font-bold leading-none tracking-tight" />
             </div>
           </div>
         </div>
@@ -184,10 +171,10 @@ const HomePage = () => {
             onClick={() => navigate(tile.path)}
             className="flex flex-col items-center gap-2 hover-scale"
           >
-            <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center", tile.color)}>
-              <tile.icon className="w-6 h-6 text-primary-foreground" />
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-card" style={{ border: "1px solid rgba(15,26,46,0.08)", boxShadow: "0px 2px 8px rgba(15,26,46,0.04)" }}>
+              <tile.icon className="w-6 h-6" style={{ color: "#C6A75E" }} />
             </div>
-            <span className="text-[13px] text-[#334155] dark:text-gray-200 font-semibold text-center leading-tight">{tile.label}</span>
+            <span className="text-[13px] text-foreground font-semibold text-center leading-tight">{tile.label}</span>
           </button>
         ))}
       </div>
@@ -195,9 +182,9 @@ const HomePage = () => {
       {/* Active Groups */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-[19px] font-semibold text-[#0F172A] dark:text-gray-100">Active Groups</h3>
-          <button onClick={() => navigate("/groups")} className="text-[15px] text-[#0F172A] dark:text-gray-100 hover:text-primary transition-colors flex items-center">
-            See all <ChevronRight className="w-[18px] h-[18px] ml-0.5 text-[#3b82f6]" strokeWidth={2.5} />
+          <h3 className="text-[19px] font-semibold text-foreground">Active Groups</h3>
+          <button onClick={() => navigate("/groups")} className="text-[15px] font-medium transition-colors flex items-center" style={{ color: "#C6A75E" }}>
+            See all <ChevronRight className="w-[18px] h-[18px] ml-0.5" strokeWidth={2.5} />
           </button>
         </div>
         <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
@@ -231,7 +218,7 @@ const HomePage = () => {
                       </div>
                     )}
                   </div>
-                  <span className="text-[12px] font-medium text-[#64748B] dark:text-gray-400">{group.members?.length || 0} members</span>
+                  <span className="text-[12px] font-medium text-muted-foreground">{group.members?.length || 0} members</span>
                 </div>
               </div>
             </Card>
@@ -252,9 +239,9 @@ const HomePage = () => {
       {friends.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-[19px] font-semibold text-[#0F172A] dark:text-gray-100">Friends</h3>
-            <button onClick={() => navigate("/friends")} className="text-[15px] text-[#0F172A] dark:text-gray-100 hover:text-primary transition-colors flex items-center">
-              See all <ChevronRight className="w-[18px] h-[18px] ml-0.5 text-[#3b82f6]" strokeWidth={2.5} />
+            <h3 className="text-[19px] font-semibold text-foreground">Friends</h3>
+            <button onClick={() => navigate("/friends")} className="text-[15px] font-medium transition-colors flex items-center" style={{ color: "#C6A75E" }}>
+              See all <ChevronRight className="w-[18px] h-[18px] ml-0.5" strokeWidth={2.5} />
             </button>
           </div>
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
@@ -271,7 +258,7 @@ const HomePage = () => {
                       {name.substring(0, 2).toUpperCase()}
                     </div>
                   )}
-                  <span className="text-[13px] text-[#0F172A] dark:text-gray-100 font-medium text-center leading-tight w-16 truncate mt-1">{name}</span>
+                  <span className="text-[13px] text-foreground font-medium text-center leading-tight w-16 truncate mt-1">{name}</span>
                   {convertedBal !== 0 && (
                     <span className={cn("text-[12px] font-bold", convertedBal > 0 ? "text-receive" : "text-owed")}>
                       {convertedBal > 0 ? "+" : ""}{getCurrencySymbol()}{Math.abs(Math.round(convertedBal * 100) / 100)}
@@ -284,14 +271,13 @@ const HomePage = () => {
         </section>
       )}
 
-      {/* Recent Expenses */}
       {/* Transactions */}
       <section>
-        <Card className="pt-6 pb-4 px-6 rounded-[32px] border-0 shadow-sm bg-white dark:bg-[#111c2a]">
+        <Card className="pt-6 pb-4 px-6 rounded-[32px] border-0 shadow-sm bg-card">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-[19px] font-semibold text-[#0F172A] dark:text-gray-100">Transactions</h3>
-            <button onClick={() => navigate("/activity")} className="text-[15px] text-[#0F172A] dark:text-gray-100 hover:text-primary transition-colors flex items-center">
-              All transactions <ChevronRight className="w-[18px] h-[18px] ml-0.5 text-[#3b82f6]" strokeWidth={2.5} />
+            <h3 className="text-[19px] font-semibold text-foreground">Transactions</h3>
+            <button onClick={() => navigate("/activity")} className="text-[15px] font-medium transition-colors flex items-center" style={{ color: "#C6A75E" }}>
+              All transactions <ChevronRight className="w-[18px] h-[18px] ml-0.5" strokeWidth={2.5} />
             </button>
           </div>
 
@@ -309,7 +295,7 @@ const HomePage = () => {
                   onClick={() => setSelectedExpense(exp)}
                   className={cn(
                     "flex items-center justify-between py-[18px] cursor-pointer hover:bg-muted/30 transition-colors",
-                    index !== recentExpenses.length - 1 ? "border-b border-[#F1F5F9] dark:border-[#1e293b]" : ""
+                    index !== recentExpenses.length - 1 ? "border-b border-border" : ""
                   )}
                 >
                   <div className="flex items-center gap-3">
@@ -320,13 +306,12 @@ const HomePage = () => {
                         className="w-full h-full object-contain drop-shadow-sm"
                       />
                     </div>
-                    {/* Vertically centered text container */}
                     <div className="flex flex-col justify-center gap-1 mt-0.5">
-                      <p className="text-[16px] font-medium text-[#0F172A] dark:text-gray-100 leading-none tracking-tight">{exp.expenseNote || "Transaction"}</p>
-                      <p className="text-[14px] text-[#64748B] dark:text-gray-400 leading-none tracking-tight">{groupName}</p>
+                      <p className="text-[16px] font-medium text-foreground leading-none tracking-tight">{exp.expenseNote || "Transaction"}</p>
+                      <p className="text-[14px] text-muted-foreground leading-none tracking-tight">{groupName}</p>
                     </div>
                   </div>
-                  <p className="text-[16px] font-semibold text-[#334155] dark:text-gray-200 tracking-tight">
+                  <p className="text-[16px] font-semibold text-foreground tracking-tight">
                     {getCurrencySymbol(exp.currency)}{Number(exp.amount).toFixed(2)}
                   </p>
                 </div>
