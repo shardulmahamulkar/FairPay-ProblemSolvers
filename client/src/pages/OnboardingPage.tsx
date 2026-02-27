@@ -8,25 +8,25 @@ const slides = [
     icon: Wallet,
     title: "Welcome to FairPay",
     description: "Split expenses effortlessly with friends and groups. No more awkward money conversations.",
-    gradient: "from-[#4398BA] to-[#C3F0F7]",
+    gradient: "from-[#1E2A44] to-[#3A4F6E]",
   },
   {
     icon: Users,
     title: "Smart Group Splitting",
     description: "Create groups, track shared expenses, and let FairPay calculate who owes what.",
-    gradient: "from-[#4398BA] via-[#5BB5D1] to-[#C3F0F7]",
+    gradient: "from-[#1E2A44] via-[#2A3D62] to-[#3A4F6E]",
   },
   {
     icon: BarChart3,
     title: "Financial Health",
     description: "Monitor your group's financial health with insights, streaks, and fairness scores.",
-    gradient: "from-[#3A8BAD] via-[#4398BA] to-[#C3F0F7]",
+    gradient: "from-[#162036] via-[#1E2A44] to-[#3A4F6E]",
   },
   {
     icon: Sparkles,
     title: "Ready to Go!",
     description: "Join thousands splitting expenses fairly. Your wallet will thank you.",
-    gradient: "from-[#2A7A9A] via-[#4398BA] to-[#C3F0F7]",
+    gradient: "from-[#0F1A2E] via-[#1E2A44] to-[#3A4F6E]",
   },
 ];
 

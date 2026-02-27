@@ -4,107 +4,107 @@
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 222 47% 11%;
+    --background: 218 24% 96%;
+    --foreground: 220 52% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 220 52% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 220 52% 12%;
 
-    --primary: 197 50% 49%;
+    --primary: 220 40% 19%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 20% 95%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 218 20% 93%;
+    --secondary-foreground: 220 52% 12%;
 
-    --muted: 210 20% 95%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 218 20% 93%;
+    --muted-foreground: 218 10% 41%;
 
-    --accent: 210 20% 95%;
-    --accent-foreground: 222 47% 11%;
+    --accent: 218 20% 93%;
+    --accent-foreground: 220 52% 12%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 45% 33%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 142 60% 40%;
+    --success: 160 33% 28%;
     --success-foreground: 0 0% 100%;
 
-    --owed: 0 72% 51%;
+    --owed: 0 45% 33%;
     --owed-foreground: 0 0% 100%;
 
-    --receive: 142 60% 40%;
+    --receive: 160 33% 28%;
     --receive-foreground: 0 0% 100%;
 
-    --border: 214 20% 90%;
-    --input: 214 20% 90%;
-    --ring: 197 50% 49%;
+    --border: 220 52% 12% / 0.08;
+    --input: 218 20% 90%;
+    --ring: 38 54% 57%;
 
-    --nav-footer: 197 65% 35%;
+    --nav-footer: 220 40% 19%;
     --nav-footer-foreground: 0 0% 100%;
 
     --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 197 50% 49%;
+    --sidebar-background: 218 24% 96%;
+    --sidebar-foreground: 220 52% 12%;
+    --sidebar-primary: 220 40% 19%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 20% 95%;
-    --sidebar-accent-foreground: 210 20% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 197 50% 49%;
+    --sidebar-accent: 218 20% 93%;
+    --sidebar-accent-foreground: 220 52% 12%;
+    --sidebar-border: 220 52% 12% / 0.08;
+    --sidebar-ring: 220 40% 19%;
   }
 
   .dark {
-    --background: 220 20% 8%;
-    --foreground: 210 20% 95%;
+    --background: 222 60% 7%;
+    --foreground: 36 20% 94%;
 
-    --card: 220 20% 12%;
-    --card-foreground: 210 20% 95%;
+    --card: 222 48% 16%;
+    --card-foreground: 36 20% 94%;
 
-    --popover: 220 20% 12%;
-    --popover-foreground: 210 20% 95%;
+    --popover: 222 48% 16%;
+    --popover-foreground: 36 20% 94%;
 
-    --primary: 197 50% 49%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 36 20% 94%;
+    --primary-foreground: 222 60% 7%;
 
-    --secondary: 220 20% 16%;
-    --secondary-foreground: 210 20% 95%;
+    --secondary: 222 50% 13%;
+    --secondary-foreground: 36 20% 94%;
 
-    --muted: 220 20% 16%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 222 50% 13%;
+    --muted-foreground: 36 20% 94% / 0.55;
 
-    --accent: 220 20% 16%;
-    --accent-foreground: 210 20% 95%;
+    --accent: 222 50% 13%;
+    --accent-foreground: 36 20% 94%;
 
-    --destructive: 0 62% 35%;
+    --destructive: 0 45% 40%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 142 50% 35%;
+    --success: 160 33% 35%;
     --success-foreground: 0 0% 100%;
 
-    --owed: 0 62% 45%;
+    --owed: 0 45% 42%;
     --owed-foreground: 0 0% 100%;
 
-    --receive: 142 50% 40%;
+    --receive: 160 33% 38%;
     --receive-foreground: 0 0% 100%;
 
-    --border: 220 20% 20%;
-    --input: 220 20% 20%;
-    --ring: 197 50% 49%;
+    --border: 0 0% 100% / 0.06;
+    --input: 222 50% 18%;
+    --ring: 38 54% 57%;
 
-    --nav-footer: 197 65% 35%;
-    --nav-footer-foreground: 0 0% 100%;
+    --nav-footer: 222 50% 12%;
+    --nav-footer-foreground: 36 20% 94%;
 
-    --sidebar-background: 220 20% 10%;
-    --sidebar-foreground: 210 20% 90%;
-    --sidebar-primary: 197 50% 49%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 20% 16%;
-    --sidebar-accent-foreground: 210 20% 90%;
-    --sidebar-border: 220 20% 20%;
-    --sidebar-ring: 197 50% 49%;
+    --sidebar-background: 222 50% 8%;
+    --sidebar-foreground: 36 20% 90%;
+    --sidebar-primary: 36 20% 94%;
+    --sidebar-primary-foreground: 222 60% 7%;
+    --sidebar-accent: 222 50% 13%;
+    --sidebar-accent-foreground: 36 20% 90%;
+    --sidebar-border: 0 0% 100% / 0.06;
+    --sidebar-ring: 36 20% 94%;
   }
 }
 
@@ -134,6 +134,24 @@
 @layer utilities {
   .hover-scale {
     @apply transition-transform duration-200 hover:scale-105;
+  }
+
+  /* Gold thin divider — elegant luxury separator */
+  .gold-divider {
+    height: 1.5px;
+    background: linear-gradient(to right, transparent, #C6A75E 25%, #C6A75E 75%, transparent);
+    opacity: 0.55;
+  }
+
+  /* Gold focus ring for inputs */
+  .gold-focus:focus-within {
+    outline: none;
+    box-shadow: 0 0 0 1.5px rgba(198, 167, 94, 0.5);
+  }
+
+  /* Gold accent text */
+  .text-gold {
+    color: #C6A75E;
   }
 
   .scrollbar-hide {

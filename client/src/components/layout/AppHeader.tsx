@@ -15,7 +15,7 @@ const AppHeader = () => {
         className="text-xl font-bold text-primary cursor-pointer tracking-tight shrink-0"
         onClick={() => navigate("/")}
       >
-        Fair<span className="text-foreground">Pay</span>
+        Fair<span style={{ color: "#C6A75E" }}>Pay</span>
       </h1>
       <p className="text-sm text-muted-foreground truncate mx-3 min-w-0 hidden sm:block">
         Welcome back, <span className="font-semibold text-foreground">{displayName}</span>
@@ -26,7 +26,7 @@ const AppHeader = () => {
           className="relative p-2 rounded-full hover:bg-muted transition-colors"
         >
           <Bell className="w-5 h-5 text-muted-foreground" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-owed rounded-full" />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ backgroundColor: "#C6A75E" }} />
         </button>
         <button
           onClick={() => navigate("/profile")}

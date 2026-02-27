@@ -335,7 +335,7 @@ const LoginPage = () => {
   // ── Loading splash ─────────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#4398BA] via-[#C3F0F7] to-background">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#1E2A44] via-[#2A3D62] to-background">
         <Loader2 className="w-8 h-8 animate-spin text-white" />
       </div>
     );
@@ -345,7 +345,7 @@ const LoginPage = () => {
   // RENDER
   // ══════════════════════════════════════════════════════════════════════════
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 max-w-md mx-auto bg-gradient-to-b from-[#4398BA] via-[#C3F0F7] to-background">
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 max-w-md mx-auto bg-gradient-to-b from-[#1E2A44] via-[#2A3D62] to-background">
 
       {/* Header */}
       <div className="text-center mb-8 animate-fade-in">

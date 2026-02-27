@@ -7,7 +7,7 @@ export const useConfetti = () => {
       particleCount: 120,
       spread: 80,
       origin: { y: 0.6 },
-      colors: ["#4398BA", "#C3F0F7", "#22c55e", "#ffffff"],
+      colors: ["#1E2A44", "#C6A75E", "#2F5E4E", "#ffffff"],
     });
   }, []);
   return fire;
