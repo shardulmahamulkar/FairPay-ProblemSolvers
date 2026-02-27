@@ -626,7 +626,7 @@ const GroupDetailPage = () => {
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "upi" | null>(null);
   const [pendingSettleIds, setPendingSettleIds] = useState<Set<string>>(new Set());
   const [selectedExpense, setSelectedExpense] = useState<any | null>(null);
-  const { defaultCurrency, formatAmount } = useCurrency();
+  const { defaultCurrency, formatAmount, convertAmount } = useCurrency();
 
   // Resolve user IDs to display names
   const getName = (userId: string) => {
@@ -702,10 +702,10 @@ const GroupDetailPage = () => {
       );
       for (let i = 0; i < expensesArr.length; i++) {
         const originalCurrency = expensesArr[i].currency || "INR";
-        expensesArr[i].amount = convertedExpenses[i];
+        expensesArr[i].amount = convertedExpenses[i].convertedAmount;
         if (expensesArr[i].participatorsInvolved) {
           for (let j = 0; j < expensesArr[i].participatorsInvolved.length; j++) {
-            expensesArr[i].participatorsInvolved[j].amount = await convertAmount(expensesArr[i].participatorsInvolved[j].amount, originalCurrency, defaultCurrency);
+            expensesArr[i].participatorsInvolved[j].amount = convertAmount(expensesArr[i].participatorsInvolved[j].amount, originalCurrency);
             expensesArr[i].participatorsInvolved[j].currency = defaultCurrency;
           }
         }
@@ -717,7 +717,7 @@ const GroupDetailPage = () => {
         defaultCurrency
       );
       for (let i = 0; i < balancesArr.length; i++) {
-        balancesArr[i].amount = convertedBalances[i];
+        balancesArr[i].amount = convertedBalances[i].convertedAmount;
         balancesArr[i].currency = defaultCurrency;
       }
 
