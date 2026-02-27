@@ -85,6 +85,8 @@ const LoginPage = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [upiId, setUpiId] = useState("");
+  const [confirmUpiId, setConfirmUpiId] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   // ── Misc ───────────────────────────────────────────────────────────────────
@@ -206,6 +208,14 @@ const LoginPage = () => {
       toast({ title: "Password too short", description: "Password must be at least 6 characters.", variant: "destructive" });
       return;
     }
+    if (!upiId || !confirmUpiId) {
+      toast({ title: "Missing UPI ID", description: "Please provide a valid UPI ID.", variant: "destructive" });
+      return;
+    }
+    if (upiId !== confirmUpiId) {
+      toast({ title: "UPI IDs do not match", description: "Please ensure both UPI IDs are identical.", variant: "destructive" });
+      return;
+    }
     setLoggingIn(true);
     setProviderDisabled(false);
     try {
@@ -221,9 +231,25 @@ const LoginPage = () => {
       }
 
       const cred = await createUserWithEmailAndPassword(auth, email, password);
+      // Wait for AuthContext listener to pick up user before syncing extra properties to mongodb? 
+      // The context will automatically sync default values. Then we can call our custom API directly here.
       if (displayName.trim()) {
         await fbUpdateProfile(cred.user, { displayName: displayName.trim() });
       }
+
+      // Save UPI ID to database
+      try {
+        const { ApiService } = await import("@/services/ApiService");
+        await ApiService.post("/api/users/sync", {
+          authId: cred.user.uid,
+          email: email,
+          displayName: displayName.trim(),
+          upiId: upiId.trim()
+        });
+      } catch (err) {
+        console.warn("Failed immediate sync of UPI ID:", err);
+      }
+
       // Send verification email — await so we know it fired before showing the screen
       await sendEmailVerification(cred.user).catch(() => { });
       // Stay on this page; polling useEffect will forward to /onboarding once verified
@@ -472,7 +498,7 @@ const LoginPage = () => {
               {(["signin", "signup", "magic"] as EmailMode[]).map((m) => (
                 <button
                   key={m}
-                  onClick={() => { setEmailMode(m); setPassword(""); setConfirmPassword(""); setDisplayName(""); setProviderDisabled(false); }}
+                  onClick={() => { setEmailMode(m); setPassword(""); setConfirmPassword(""); setDisplayName(""); setUpiId(""); setConfirmUpiId(""); setProviderDisabled(false); }}
                   className={`flex-1 text-xs py-1.5 rounded-lg font-medium transition-all ${emailMode === m ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"
                     }`}
                 >
@@ -570,6 +596,26 @@ const LoginPage = () => {
                     className="rounded-xl"
                     value={confirmPassword}
                     onChange={e => setConfirmPassword(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>UPI ID</Label>
+                  <Input
+                    type="text"
+                    placeholder="e.g. name@bank"
+                    className="rounded-xl"
+                    value={upiId}
+                    onChange={e => setUpiId(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className={upiId && upiId !== confirmUpiId ? "text-destructive" : ""}>Confirm UPI ID</Label>
+                  <Input
+                    type="text"
+                    placeholder="Re-enter UPI ID"
+                    className="rounded-xl"
+                    value={confirmUpiId}
+                    onChange={e => setConfirmUpiId(e.target.value)}
                     onKeyDown={e => e.key === "Enter" && handleEmailPasswordSignUp()}
                   />
                 </div>

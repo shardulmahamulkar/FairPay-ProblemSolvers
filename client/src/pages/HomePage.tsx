@@ -114,6 +114,24 @@ const HomePage = () => {
 
   return (
     <div className="space-y-6 animate-fade-in pt-4">
+      {/* Soft nudge for missing UPI ID */}
+      {user && !user.upiId && (
+        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 p-3 rounded-[20px] shadow-sm flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+              <span className="text-amber-600 dark:text-amber-400 font-bold text-xs">UPI</span>
+            </div>
+            <div>
+              <p className="text-[14px] font-bold text-amber-800 dark:text-amber-500 leading-tight">Update your UPI ID</p>
+              <p className="text-[12px] text-amber-700 dark:text-amber-500/80 leading-snug">Add it so friends can pay you easily.</p>
+            </div>
+          </div>
+          <Button onClick={() => navigate("/profile")} className="bg-amber-500 hover:bg-amber-600 text-white dark:bg-amber-500/20 dark:hover:bg-amber-500/30 dark:text-amber-400 h-8 text-xs font-bold rounded-xl px-4">
+            Update
+          </Button>
+        </div>
+      )}
+
       {/* Summary Card */}
       <Card className="p-5 border-0 shadow-sm rounded-[28px] relative overflow-hidden bg-[#CFE3E7] dark:bg-[#111c2a]">
         <div className="flex items-center gap-4">
