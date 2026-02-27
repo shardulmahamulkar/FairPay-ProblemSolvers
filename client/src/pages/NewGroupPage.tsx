@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ImageIcon, Shield, User as UserIcon, Plus } from "lucide-react";
+import { ArrowLeft, ImageIcon, Shield, User as UserIcon, Plus, Upload, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +47,41 @@ const NewGroupPage = () => {
     roles: { [currentUser.id]: "admin" } as Record<string, "admin" | "member">,
     backgroundImage: backgroundOptions[0],
   });
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [localImagePreview, setLocalImagePreview] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const handleLocalImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setUploadError("Please select a valid image file.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("File size too large (max 5MB).");
+      return;
+    }
+
+    setUploadError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setLocalImagePreview(dataUrl);
+      setForm(prev => ({ ...prev, backgroundImage: dataUrl }));
+    };
+    reader.onerror = () => setUploadError("Failed to read file.");
+    reader.readAsDataURL(file);
+  };
+
+  const removeLocalImage = () => {
+    setLocalImagePreview(null);
+    setForm(prev => ({ ...prev, backgroundImage: backgroundOptions[0] }));
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   // Fetch friends list
   useEffect(() => {
@@ -130,18 +165,60 @@ const NewGroupPage = () => {
             {backgroundOptions.map(url => (
               <button
                 key={url}
-                onClick={() => setForm({ ...form, backgroundImage: url })}
+                onClick={() => {
+                  setForm({ ...form, backgroundImage: url });
+                  setLocalImagePreview(null);
+                }}
                 className={cn(
                   "h-16 rounded-xl bg-cover bg-center border-2 transition-all",
-                  form.backgroundImage === url ? "border-primary ring-2 ring-primary/30" : "border-transparent"
+                  form.backgroundImage === url && !localImagePreview ? "border-primary ring-2 ring-primary/30" : "border-transparent"
                 )}
                 style={{ backgroundImage: `url(${url})` }}
               />
             ))}
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground p-2 rounded-lg bg-muted/50">
-            <ImageIcon className="w-4 h-4" />
-            <span>Custom upload coming soon</span>
+
+          <div className="space-y-3">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleLocalImageUpload}
+              accept="image/*"
+              className="hidden"
+            />
+
+            {!localImagePreview ? (
+              <Button
+                variant="outline"
+                className="w-full flex items-center justify-center gap-2 rounded-xl border-dashed py-6 hover:bg-primary/5 hover:border-primary/50 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="w-4 h-4" />
+                <span>Upload Custom Background</span>
+              </Button>
+            ) : (
+              <div className="relative group animate-in fade-in zoom-in duration-200">
+                <div
+                  className="h-24 w-full rounded-xl bg-cover bg-center border-2 border-primary ring-2 ring-primary/30"
+                  style={{ backgroundImage: `url(${localImagePreview})` }}
+                />
+                <button
+                  onClick={removeLocalImage}
+                  className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 shadow-lg hover:scale-110 transition-transform"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/50 text-white text-[10px] rounded-md backdrop-blur-sm">
+                  Custom Upload
+                </div>
+              </div>
+            )}
+
+            {uploadError && (
+              <p className="text-xs text-destructive font-medium animate-in slide-in-from-top-1">
+                {uploadError}
+              </p>
+            )}
           </div>
           <Button onClick={() => setStep(3)} className="w-full rounded-xl">Next</Button>
         </Card>

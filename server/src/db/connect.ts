@@ -17,8 +17,9 @@ export async function connectDB() {
 
     console.log("MongoDB connected 🟢");
   } catch (err) {
-    console.error("MongoDB connection error ❌", err);
-    process.exit(1);
+    console.error("MongoDB connection error ❌ (Note: Server will still start in degraded mode)");
+    console.error(err);
+    // Removed process.exit(1) to allow server to start for frontend communication
   }
 }
 
