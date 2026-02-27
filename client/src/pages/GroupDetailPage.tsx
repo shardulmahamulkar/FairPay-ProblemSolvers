@@ -60,7 +60,7 @@ import AnimatedCounter from "@/components/AnimatedCounter";
 import GroupHealthTab from "@/components/GroupHealthTab";
 import { ApiService } from "@/services/ApiService";
 import { useAuth } from "@/contexts/AuthContext";
-import { getCategoryIcon } from "@/lib/categoryIcons";
+import { getCategoryIcon, getCategoryColor } from "@/lib/categoryIcons";
 import { ExpenseDetailsDialog } from "@/components/ExpenseDetailsDialog";
 import { getCurrencySymbol } from "@/lib/currency";
 
@@ -1046,11 +1046,11 @@ const GroupDetailPage = () => {
               className="p-3 rounded-xl border-0 shadow-sm cursor-pointer hover:bg-muted/30 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden p-1.5">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden p-1.5 ${getCategoryColor(exp.category, exp.expenseNote).bg}`}>
                   <img
                     src={getCategoryIcon(exp.category, exp.expenseNote)}
                     alt={exp.category || "expense"}
-                    className="w-full h-full object-contain"
+                    className="w-full h-full object-contain invert"
                   />
                 </div>
                 <div className="flex-1 min-w-0">

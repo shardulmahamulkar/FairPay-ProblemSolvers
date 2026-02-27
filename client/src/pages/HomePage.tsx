@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import AnimatedCounter from "@/components/AnimatedCounter";
 import { useAuth } from "@/contexts/AuthContext";
 import { ApiService } from "@/services/ApiService";
-import { getCategoryIcon } from "@/lib/categoryIcons";
+import { getCategoryIcon, getCategoryColor } from "@/lib/categoryIcons";
 import { getCurrencySymbol } from "@/lib/currency";
 import { convertAllToBase } from "@/services/exchangeRate";
 import { ExpenseDetailsDialog } from "@/components/ExpenseDetailsDialog";
@@ -281,11 +281,11 @@ const HomePage = () => {
                   )}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-[34px] h-[34px] flex items-center justify-center flex-shrink-0">
+                    <div className={`w-[34px] h-[34px] rounded-lg flex items-center justify-center flex-shrink-0 p-1.5 ${getCategoryColor(exp.category, exp.expenseNote).bg}`}>
                       <img
                         src={getCategoryIcon(exp.category, exp.expenseNote)}
                         alt={exp.category || "expense"}
-                        className="w-full h-full object-contain drop-shadow-sm"
+                        className="w-full h-full object-contain drop-shadow-sm invert"
                       />
                     </div>
                     <div className="flex flex-col justify-center gap-1 mt-0.5">
