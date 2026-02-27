@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Check, Flag, ChevronDown, ChevronUp, AlertTriangle, Banknote, Smartphone, Clock } from "lucide-react";
+import { ArrowLeft, Check, Flag, ChevronDown, ChevronUp, AlertTriangle, Banknote, Smartphone, Clock, Copy } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -39,12 +39,24 @@ const SettleHubPage = () => {
   // Settle All dialog
   const [settleAllTarget, setSettleAllTarget] = useState<{ personId: string; items: any[] } | null>(null);
 
+  // UPI desktop fallback modal
+  const [upiDesktopFallback, setUpiDesktopFallback] = useState<{ link: string } | null>(null);
+
   // Track which balances already have a pending settlement request (outgoing)
   const [pendingSettleIds, setPendingSettleIds] = useState<Set<string>>(new Set());
 
   const getName = (uid: string) => {
     if (uid === user?.id) return "You";
     return userNames[uid] || uid.substring(0, 8);
+  };
+
+  const isMobileDevice = (): boolean => {
+    return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  };
+
+  const buildUpiLink = (amount: number): string => {
+    const positiveAmount = Math.abs(amount).toFixed(2);
+    return `upi://pay?pa=patankarparas%40oksbi&pn=Paras%20Patankar&am=${positiveAmount}&cu=INR&tn=FairPay%20Settlement`;
   };
 
   const fetchData = async () => {
@@ -143,6 +155,16 @@ const SettleHubPage = () => {
   const handleSettle = async () => {
     if (!settleTarget || !user?.id || !paymentMethod) return;
     try {
+      // Trigger UPI deep link before API call
+      if (paymentMethod === "upi") {
+        const upiLink = buildUpiLink(settleTarget.amount);
+        if (isMobileDevice()) {
+          window.location.href = upiLink;
+        } else {
+          setUpiDesktopFallback({ link: upiLink });
+        }
+      }
+
       await ApiService.post("/api/balance-requests/settle", {
         owedBorrowId: settleTarget._id,
         requestedBy: user.id,
@@ -151,7 +173,7 @@ const SettleHubPage = () => {
       setSettleTarget(null);
       setPaymentMethod(null);
       if (paymentMethod === "upi") {
-        toast({ title: "Settled via UPI", description: "Payment marked as completed." });
+        toast({ title: "Settlement Processing", description: "UPI payment initiated. Waiting for confirmation." });
       } else {
         toast({ title: "Settlement Requested", description: "Waiting for acknowledgment from the other party." });
       }
@@ -206,18 +228,30 @@ const SettleHubPage = () => {
   const handleSettleAll = async () => {
     if (!settleAllTarget || !user?.id || !paymentMethod) return;
     try {
+      const total = settleAllTarget.items.reduce((s, d) => s + d.amount, 0);
+
+      // Trigger UPI deep link before API calls
+      if (paymentMethod === "upi") {
+        const upiLink = buildUpiLink(total);
+        if (isMobileDevice()) {
+          window.location.href = upiLink;
+        } else {
+          setUpiDesktopFallback({ link: upiLink });
+        }
+      }
+
       await Promise.all(
         settleAllTarget.items.map(d =>
           ApiService.post("/api/balance-requests/settle", { owedBorrowId: d._id, requestedBy: user.id, paymentMethod })
         )
       );
-      const total = settleAllTarget.items.reduce((s, d) => s + d.amount, 0);
+      const itemCount = settleAllTarget.items.length;
       setSettleAllTarget(null);
       setPaymentMethod(null);
       if (paymentMethod === "upi") {
-        toast({ title: "All Settled via UPI", description: `${formatAmount(total, defaultCurrency)} across ${settleAllTarget.items.length} groups marked completed.` });
+        toast({ title: "Settlement Processing", description: `UPI payment of ${formatAmount(total, defaultCurrency)} across ${itemCount} groups initiated.` });
       } else {
-        toast({ title: "All Settlements Requested", description: `${formatAmount(total, defaultCurrency)} across ${settleAllTarget.items.length} groups sent for acknowledgment.` });
+        toast({ title: "All Settlements Requested", description: `${formatAmount(total, defaultCurrency)} across ${itemCount} groups sent for acknowledgment.` });
       }
       fetchData();
     } catch (err: any) {
@@ -510,6 +544,45 @@ const SettleHubPage = () => {
           <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => { setSettleAllTarget(null); setPaymentMethod(null); }} className="rounded-xl">Cancel</Button>
             <Button onClick={handleSettleAll} disabled={!paymentMethod} className="rounded-xl bg-receive hover:bg-receive/90 text-white">Confirm All</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* UPI Desktop Fallback Dialog */}
+      <Dialog open={!!upiDesktopFallback} onOpenChange={() => setUpiDesktopFallback(null)}>
+        <DialogContent className="rounded-2xl max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Smartphone className="w-5 h-5 text-primary" /> UPI Payment</DialogTitle>
+            <DialogDescription>
+              Open on mobile device to complete UPI payment.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <Label className="text-xs text-muted-foreground">UPI Payment Link</Label>
+            <div className="flex gap-2">
+              <Input
+                readOnly
+                value={upiDesktopFallback?.link || ""}
+                className="rounded-xl text-xs flex-1"
+                onClick={(e) => (e.target as HTMLInputElement).select()}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-xl h-9 px-3"
+                onClick={() => {
+                  if (upiDesktopFallback?.link) {
+                    navigator.clipboard.writeText(upiDesktopFallback.link);
+                    toast({ title: "Copied!", description: "UPI link copied to clipboard." });
+                  }
+                }}
+              >
+                <Copy className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button onClick={() => setUpiDesktopFallback(null)} className="rounded-xl">Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
