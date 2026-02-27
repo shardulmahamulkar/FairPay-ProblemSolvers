@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getCategoryIcon, getCategoryColor } from "@/lib/categoryIcons";
 import { getCurrencySymbol } from "@/lib/currency";
 import { ExpenseDetailsDialog } from "@/components/ExpenseDetailsDialog";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 const ActivityPage = () => {
   const { user } = useAuth();
@@ -19,6 +20,7 @@ const ActivityPage = () => {
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [selectedExpense, setSelectedExpense] = useState<any | null>(null);
+  const { formatAmount } = useCurrency();
 
   const getName = (uid: string) => {
     if (uid === user?.id) return "You";
@@ -123,7 +125,7 @@ const ActivityPage = () => {
                   </div>
                 </div>
                 <p className="text-sm font-semibold text-foreground">
-                  {getCurrencySymbol(exp.currency)}{Number(exp.amount).toFixed(2)}
+                  {formatAmount(exp.amount, exp.currency)}
                 </p>
               </Card>
             );
@@ -156,13 +158,13 @@ const ActivityPage = () => {
                   <p className="text-xs text-muted-foreground">From {getName(req.requestedBy)}</p>
                   {req.type === "settlement" && (
                     <p className="text-xs text-foreground mt-1">
-                      Wants to mark <strong>{getCurrencySymbol()}{req.amount?.toLocaleString()}</strong> as settled
+                      Wants to mark <strong>{formatAmount(req.amount, req.currency)}</strong> as settled
                     </p>
                   )}
                   {req.type === "dispute" && (
                     <div className="mt-1 space-y-0.5">
                       <p className="text-xs text-foreground">
-                        Current: <strong>{getCurrencySymbol()}{req.amount?.toLocaleString()}</strong> → Proposed: <strong>{getCurrencySymbol()}{req.proposedAmount?.toLocaleString()}</strong>
+                        Current: <strong>{formatAmount(req.amount, req.currency)}</strong> → Proposed: <strong>{formatAmount(req.proposedAmount, req.currency)}</strong>
                       </p>
                       <p className="text-xs text-muted-foreground italic">"{req.reason}"</p>
                     </div>

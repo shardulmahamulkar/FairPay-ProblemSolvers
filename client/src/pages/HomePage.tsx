@@ -11,6 +11,7 @@ import { getCategoryIcon, getCategoryColor } from "@/lib/categoryIcons";
 import { getCurrencySymbol } from "@/lib/currency";
 import { convertAllToBase } from "@/services/exchangeRate";
 import { ExpenseDetailsDialog } from "@/components/ExpenseDetailsDialog";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 const speedTiles = [
   { icon: Plus, label: "New Expense", path: "/expenses/new" },
@@ -29,6 +30,7 @@ const HomePage = () => {
   const [friendBalances, setFriendBalances] = useState<Record<string, number>>({});
   const [userAvatars, setUserAvatars] = useState<Record<string, string>>({});
   const [userNames, setUserNames] = useState<Record<string, string>>({});
+  const { defaultCurrency, formatAmount } = useCurrency();
 
   useEffect(() => {
     if (!user?.id) return;
@@ -65,12 +67,14 @@ const HomePage = () => {
         const owedDocs = res.owedDocs || [];
         const receivableDocs = res.receivableDocs || [];
 
-        // Convert each debt to INR
+        // Convert each debt to defaultCurrency
         const convertedOwed = await convertAllToBase(
-          owedDocs.map((d: any) => ({ amount: d.amount, currency: d.currency || "INR" }))
+          owedDocs.map((d: any) => ({ amount: d.amount, currency: d.currency || "INR" })),
+          defaultCurrency
         );
         const convertedReceivable = await convertAllToBase(
-          receivableDocs.map((d: any) => ({ amount: d.amount, currency: d.currency || "INR" }))
+          receivableDocs.map((d: any) => ({ amount: d.amount, currency: d.currency || "INR" })),
+          defaultCurrency
         );
 
         const totalOwed = convertedOwed.reduce((sum, d) => sum + d.convertedAmount, 0);
@@ -101,7 +105,7 @@ const HomePage = () => {
     ApiService.get(`/api/friends/user/${user.id}`)
       .then((res: any) => setFriends((res || []).slice(0, 5)))
       .catch(console.error);
-  }, [user]);
+  }, [user, defaultCurrency]);
 
   const activeGroups = groups.filter(g => !g.isArchived);
 
@@ -152,12 +156,12 @@ const HomePage = () => {
           <div className="flex-1 flex flex-col gap-3">
             <div className="pl-3" style={{ borderLeft: "2px solid #C6A75E" }}>
               <span className="text-white/50 text-[11px] font-medium block mb-1">To Pay</span>
-              <AnimatedCounter value={summary.totalOwed} prefix={getCurrencySymbol()} className="text-white text-[20px] font-bold leading-none tracking-tight" />
+              <AnimatedCounter value={summary.totalOwed} prefix={getCurrencySymbol(defaultCurrency)} className="text-white text-[20px] font-bold leading-none tracking-tight" />
             </div>
             <div style={{ height: "1px", backgroundColor: "rgba(255,255,255,0.07)" }} />
             <div className="pl-3" style={{ borderLeft: "2px solid #C6A75E" }}>
               <span className="text-white/50 text-[11px] font-medium block mb-1">To Receive</span>
-              <AnimatedCounter value={summary.totalReceivable} prefix={getCurrencySymbol()} className="text-white text-[20px] font-bold leading-none tracking-tight" />
+              <AnimatedCounter value={summary.totalReceivable} prefix={getCurrencySymbol(defaultCurrency)} className="text-white text-[20px] font-bold leading-none tracking-tight" />
             </div>
           </div>
         </div>
@@ -261,7 +265,7 @@ const HomePage = () => {
                   <span className="text-[13px] text-foreground font-medium text-center leading-tight w-16 truncate mt-1">{name}</span>
                   {convertedBal !== 0 && (
                     <span className={cn("text-[12px] font-bold", convertedBal > 0 ? "text-receive" : "text-owed")}>
-                      {convertedBal > 0 ? "+" : ""}{getCurrencySymbol()}{Math.abs(Math.round(convertedBal * 100) / 100)}
+                      {convertedBal > 0 ? "+" : ""}{getCurrencySymbol(defaultCurrency)}{Math.abs(Math.round(convertedBal * 100) / 100)}
                     </span>
                   )}
                 </div>
@@ -312,7 +316,7 @@ const HomePage = () => {
                     </div>
                   </div>
                   <p className="text-[16px] font-semibold text-foreground tracking-tight">
-                    {getCurrencySymbol(exp.currency)}{Number(exp.amount).toFixed(2)}
+                    {formatAmount(exp.amount, exp.currency)}
                   </p>
                 </div>
               );

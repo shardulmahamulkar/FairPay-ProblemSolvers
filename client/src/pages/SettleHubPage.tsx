@@ -12,8 +12,8 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { ApiService } from "@/services/ApiService";
 import { useToast } from "@/hooks/use-toast";
-import { getCurrencySymbol } from "@/lib/currency";
 import { convertAllToBase } from "@/services/exchangeRate";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 const SettleHubPage = () => {
   const navigate = useNavigate();
@@ -26,6 +26,7 @@ const SettleHubPage = () => {
   const [userAvatars, setUserAvatars] = useState<Record<string, string>>({});
   const [expandedPeople, setExpandedPeople] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
+  const { defaultCurrency, formatAmount, convertAmount } = useCurrency();
 
   // Settle dialog
   const [settleTarget, setSettleTarget] = useState<any | null>(null);
@@ -70,10 +71,12 @@ const SettleHubPage = () => {
       const receivableDocs = s.receivableDocs || [];
 
       const convertedOwed = await convertAllToBase(
-        owedDocs.map((d: any) => ({ amount: d.amount, currency: d.currency || "INR" }))
+        owedDocs.map((d: any) => ({ amount: d.amount, currency: d.currency || "INR" })),
+        defaultCurrency
       );
       const convertedReceivable = await convertAllToBase(
-        receivableDocs.map((d: any) => ({ amount: d.amount, currency: d.currency || "INR" }))
+        receivableDocs.map((d: any) => ({ amount: d.amount, currency: d.currency || "INR" })),
+        defaultCurrency
       );
 
       // Merge converted amounts back into the docs
@@ -116,7 +119,7 @@ const SettleHubPage = () => {
     }
   };
 
-  useEffect(() => { fetchData(); }, [user]);
+  useEffect(() => { fetchData(); }, [user, defaultCurrency]);
 
   // Group debts by person (the other party)
   const groupByPerson = (docs: any[], isOwed: boolean) => {
@@ -212,9 +215,9 @@ const SettleHubPage = () => {
       setSettleAllTarget(null);
       setPaymentMethod(null);
       if (paymentMethod === "upi") {
-        toast({ title: "All Settled via UPI", description: `${getCurrencySymbol()}${total.toLocaleString()} across ${settleAllTarget.items.length} groups marked completed.` });
+        toast({ title: "All Settled via UPI", description: `${formatAmount(total, defaultCurrency)} across ${settleAllTarget.items.length} groups marked completed.` });
       } else {
-        toast({ title: "All Settlements Requested", description: `${getCurrencySymbol()}${total.toLocaleString()} across ${settleAllTarget.items.length} groups sent for acknowledgment.` });
+        toast({ title: "All Settlements Requested", description: `${formatAmount(total, defaultCurrency)} across ${settleAllTarget.items.length} groups sent for acknowledgment.` });
       }
       fetchData();
     } catch (err: any) {
@@ -248,7 +251,7 @@ const SettleHubPage = () => {
           </div>
           <div className="flex items-center gap-2">
             <span className={cn("font-bold text-sm", isOwed ? "text-owed" : "text-receive")}>
-              {isOwed ? "-" : "+"}{getCurrencySymbol()}{total.toLocaleString()}
+              {isOwed ? "-" : "+"}{formatAmount(total, defaultCurrency)}
             </span>
             {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
           </div>
@@ -261,7 +264,7 @@ const SettleHubPage = () => {
               className="w-full rounded-xl h-8 text-xs bg-receive hover:bg-receive/90 text-white"
               onClick={(e) => { e.stopPropagation(); setSettleAllTarget(group); }}
             >
-              <Check className="w-3 h-3 mr-1" /> Settle All ({group.items.length} groups) — {getCurrencySymbol()}{total.toLocaleString()}
+              <Check className="w-3 h-3 mr-1" /> Settle All ({group.items.length} groups) — {formatAmount(total, defaultCurrency)}
             </Button>
           </div>
         )}
@@ -274,7 +277,7 @@ const SettleHubPage = () => {
                   <div>
                     <p className="text-xs font-medium text-foreground">{d.groupName || "Unnamed Group"}</p>
                     <p className={cn("text-xs", isOwed ? "text-owed" : "text-receive")}>
-                      {isOwed ? "You owe" : "Owes you"} {getCurrencySymbol()}{d.amount?.toLocaleString()}
+                      {isOwed ? "You owe" : "Owes you"} {formatAmount(d.amount, defaultCurrency)}
                     </p>
                   </div>
                   <div className="flex gap-1.5">
@@ -334,11 +337,11 @@ const SettleHubPage = () => {
       <div className="grid grid-cols-2 gap-3">
         <Card className="p-4 rounded-xl border-0 shadow-sm text-center">
           <p className="text-xs text-muted-foreground mb-1">You Owe</p>
-          <p className="text-xl font-bold text-owed">{getCurrencySymbol()}{summary.totalOwed?.toLocaleString()}</p>
+          <p className="text-xl font-bold text-owed">{formatAmount(summary.totalOwed, defaultCurrency)}</p>
         </Card>
         <Card className="p-4 rounded-xl border-0 shadow-sm text-center">
           <p className="text-xs text-muted-foreground mb-1">You're Owed</p>
-          <p className="text-xl font-bold text-receive">{getCurrencySymbol()}{summary.totalReceivable?.toLocaleString()}</p>
+          <p className="text-xl font-bold text-receive">{formatAmount(summary.totalReceivable, defaultCurrency)}</p>
         </Card>
       </div>
 
@@ -358,11 +361,11 @@ const SettleHubPage = () => {
                   </p>
                   <p className="text-xs text-muted-foreground">From: {getName(req.requestedBy)}</p>
                   {req.type === "settlement" && (
-                    <p className="text-xs text-foreground mt-0.5">Wants to mark <strong>{getCurrencySymbol()}{req.amount?.toLocaleString()}</strong> as settled</p>
+                    <p className="text-xs text-foreground mt-0.5">Wants to mark <strong>{formatAmount(req.amount, req.currency)}</strong> as settled</p>
                   )}
                   {req.type === "dispute" && (
                     <>
-                      <p className="text-xs text-foreground mt-0.5">Current: {getCurrencySymbol()}{req.amount?.toLocaleString()} → Proposed: {getCurrencySymbol()}{req.proposedAmount?.toLocaleString()}</p>
+                      <p className="text-xs text-foreground mt-0.5">Current: {formatAmount(req.amount, req.currency)} → Proposed: {formatAmount(req.proposedAmount, req.currency)}</p>
                       <p className="text-xs text-muted-foreground italic">"{req.reason}"</p>
                     </>
                   )}
@@ -410,7 +413,7 @@ const SettleHubPage = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Check className="w-5 h-5 text-receive" /> Confirm Settlement</DialogTitle>
             <DialogDescription>
-              Send a settlement request of <strong>{getCurrencySymbol()}{settleTarget?.amount?.toLocaleString()}</strong> for <strong>{settleTarget?.groupName}</strong>?
+              Send a settlement request of <strong>{formatAmount(settleTarget?.amount, defaultCurrency)}</strong> for <strong>{settleTarget?.groupName}</strong>?
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-2">
@@ -445,7 +448,7 @@ const SettleHubPage = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-owed" /> File Dispute</DialogTitle>
             <DialogDescription>
-              Current amount: <strong>{getCurrencySymbol()}{disputeTarget?.amount?.toLocaleString()}</strong> for <strong>{disputeTarget?.groupName}</strong>
+              Current amount: <strong>{formatAmount(disputeTarget?.amount, defaultCurrency)}</strong> for <strong>{disputeTarget?.groupName}</strong>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -482,7 +485,7 @@ const SettleHubPage = () => {
             <DialogTitle className="flex items-center gap-2"><Check className="w-5 h-5 text-receive" /> Confirm Batch Settlement</DialogTitle>
             <DialogDescription>
               Settle all <strong>{settleAllTarget?.items.length}</strong> balances with <strong>{settleAllTarget ? getName(settleAllTarget.personId) : ""}</strong>?
-              Total amount: <strong>{getCurrencySymbol()}{settleAllTarget?.items.reduce((s: number, d: any) => s + d.amount, 0)?.toLocaleString()}</strong>
+              Total amount: <strong>{formatAmount(settleAllTarget?.items.reduce((s: number, d: any) => s + d.amount, 0), defaultCurrency)}</strong>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-2">
