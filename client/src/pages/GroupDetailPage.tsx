@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -1239,7 +1240,7 @@ const GroupDetailPage = () => {
           />
         </TabsContent>
 
-        {/* Balances Tab — filtered to current user only */}
+        {/* Balances Tab — grouped by person, per-record actions + consolidated settle */}
         <TabsContent value="balances" className="space-y-3 mt-4">
           {balances.filter(
             (b) => b.payerId === user?.id || b.payeeId === user?.id,
