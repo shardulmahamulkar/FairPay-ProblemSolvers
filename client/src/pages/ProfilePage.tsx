@@ -239,7 +239,15 @@ const ProfilePage = () => {
                     await logout();
                     navigate("/onboarding");
                   } catch (e: any) {
-                    toast({ title: "Delete failed", description: e.message || "Please re-login and try again.", variant: "destructive" });
+                    if (e.code === 'auth/requires-recent-login' || (e.message || "").includes('requires-recent-login')) {
+                      toast({
+                        title: "Re-authentication required",
+                        description: "For security, you must log out and log back in right before deleting your account.",
+                        variant: "destructive"
+                      });
+                    } else {
+                      toast({ title: "Delete failed", description: e.message || "Please re-login and try again.", variant: "destructive" });
+                    }
                   }
                 }}
                 className="rounded-xl"

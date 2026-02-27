@@ -11,8 +11,7 @@ export async function connectDB() {
     await mongoose.connect(MONGODB_URI, {
       dbName: "fairpay",
       serverSelectionTimeoutMS: 10000,
-      connectTimeoutMS: 10000,
-      family: 4 // Force IPv4
+      connectTimeoutMS: 10000
     });
 
     console.log("MongoDB connected 🟢");
