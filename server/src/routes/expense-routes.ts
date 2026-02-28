@@ -53,6 +53,16 @@ expenseRoutes.get("/balances/:groupId", async (req, res) => {
     }
 });
 
+// Get simplified (optimized) settlements for a group
+expenseRoutes.get("/simplified-balances/:groupId", async (req, res) => {
+    try {
+        const result = await ExpenseService.getSimplifiedBalances(req.params.groupId);
+        res.json(result);
+    } catch (err: any) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
 // Delete an expense
 expenseRoutes.delete("/:expenseId", async (req, res) => {
     try {

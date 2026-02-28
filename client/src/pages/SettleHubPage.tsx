@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { ArrowLeft, Check, Flag, ChevronDown, ChevronUp, AlertTriangle, Banknote, Smartphone, Clock, Copy } from "lucide-react";
+import { ArrowLeft, Check, Flag, ChevronDown, ChevronUp, AlertTriangle, Banknote, Smartphone, Clock, Copy, Zap, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,9 @@ const SettleHubPage = () => {
   const [userUpiIds, setUserUpiIds] = useState<Record<string, string>>({});
   const [expandedPeople, setExpandedPeople] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
+
+  // Smart Settle: simplified/optimized settlements across groups
+  const [smartSettlements, setSmartSettlements] = useState<any[]>([]);
   const { defaultCurrency, formatAmount, convertAmount } = useCurrency();
 
   // Action dialog targets (now operating on the aggregated person object)
@@ -126,6 +129,35 @@ const SettleHubPage = () => {
       setUserNames(nameMap);
       setUserAvatars(avatarMap);
       setUserUpiIds(upiIdMap);
+
+      // Fetch simplified balances for each group the user is in
+      try {
+        const groupsRes: any = await ApiService.get(`/api/groups/user/${user.id}`);
+        const groups = Array.isArray(groupsRes) ? groupsRes : [];
+        const allSimplified: any[] = [];
+        await Promise.all(
+          groups.map(async (g: any) => {
+            try {
+              const res: any = await ApiService.get(`/api/expenses/simplified-balances/${g._id}`);
+              if (res.simplified && res.simplified.length > 0) {
+                // Only include settlements where the current user is involved
+                const relevant = res.simplified.filter((s: any) => s.from === user.id || s.to === user.id);
+                // Check if simplified differs from raw (i.e., there's actual optimization)
+                const rawPairs = (res.rawBalances || []).filter((b: any) => b.payerId === user.id || b.payeeId === user.id);
+                // Only show smart settle if simplified count < raw pairs count (optimization found)
+                if (relevant.length > 0 && relevant.length < rawPairs.length) {
+                  allSimplified.push(...relevant.map((s: any) => ({
+                    ...s,
+                    rawOwedBorrowIds: (res.rawBalances || []).map((b: any) => b._id),
+                  })));
+                }
+              }
+            } catch { /* ignore per-group errors */ }
+          })
+        );
+        setSmartSettlements(allSimplified);
+      } catch { /* ignore */ }
+
     } catch (err) {
       console.error(err);
     } finally {
@@ -419,6 +451,88 @@ const SettleHubPage = () => {
           <p className="text-xl font-bold text-receive">{formatAmount(summary.totalReceivable, defaultCurrency)}</p>
         </Card>
       </div>
+
+      {/* Smart Settle — Optimized Settlements */}
+      {smartSettlements.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Zap className="w-4 h-4 text-amber-500" />
+            Smart Settle
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500/40 text-amber-600 dark:text-amber-400">Optimized</Badge>
+          </h3>
+          <p className="text-xs text-muted-foreground -mt-1">
+            These are optimized payments that reduce the number of transactions needed.
+          </p>
+          {smartSettlements.map((s, idx) => {
+            const isYouPaying = s.from === user?.id;
+            const otherName = isYouPaying ? s.toName : s.fromName;
+            const otherAvatar = isYouPaying ? s.toAvatar : s.fromAvatar;
+            const otherUpiId = isYouPaying ? s.toUpiId : "";
+            return (
+              <Card key={`smart-${idx}`} className="rounded-2xl border-0 shadow-sm overflow-hidden border-l-2 border-l-amber-500">
+                <div className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {/* From avatar */}
+                      {isYouPaying ? (
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">You</div>
+                      ) : (
+                        (otherAvatar?.startsWith("http") || otherAvatar?.startsWith("data:")) ? (
+                          <img src={otherAvatar} alt="" className="w-8 h-8 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                            {otherName.substring(0, 2).toUpperCase()}
+                          </div>
+                        )
+                      )}
+                      <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                      {/* To avatar */}
+                      {!isYouPaying ? (
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">You</div>
+                      ) : (
+                        (otherAvatar?.startsWith("http") || otherAvatar?.startsWith("data:")) ? (
+                          <img src={otherAvatar} alt="" className="w-8 h-8 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                            {otherName.substring(0, 2).toUpperCase()}
+                          </div>
+                        )
+                      )}
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">
+                          {isYouPaying ? `Pay ${otherName} directly` : `${otherName} pays you directly`}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{s.groupName} · Saves a step</p>
+                      </div>
+                    </div>
+                    <span className={cn("font-bold text-sm", isYouPaying ? "text-owed" : "text-receive")}>
+                      {isYouPaying ? "-" : "+"}{formatAmount(s.amount, defaultCurrency)}
+                    </span>
+                  </div>
+
+                  {isYouPaying && (
+                    <Button
+                      size="sm"
+                      className="w-full rounded-xl h-9 text-xs bg-amber-500 hover:bg-amber-600 text-white font-medium"
+                      onClick={() => setSettleTarget({
+                        netBalance: -s.amount,
+                        personId: s.to,
+                        owedItems: (summary.owedDocs || []).filter((d: any) =>
+                          d.payeeId === s.to || d.payerId === user?.id
+                        ),
+                        allItems: [],
+                        isSmartSettle: true,
+                      })}
+                    >
+                      <Zap className="w-3 h-3 mr-1" /> Pay Directly · {formatAmount(s.amount, defaultCurrency)}
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            );
+          })}
+        </section>
+      )}
 
       {/* Incoming acknowledgment requests */}
       {pendingRequests.length > 0 && (

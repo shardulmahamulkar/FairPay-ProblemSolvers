@@ -157,6 +157,106 @@ export class ExpenseService {
         return OwedBorrow.find({ groupId, status: "pending" });
     }
 
+    // Get simplified (minimized) settlements for a group
+    // Uses greedy algorithm: compute net balance per member, then match largest creditor with largest debtor
+    static async getSimplifiedBalances(groupId: string) {
+        const rawBalances = await OwedBorrow.find({ groupId, status: "pending" }).lean();
+
+        if (rawBalances.length === 0) return { simplified: [], rawBalances: [] };
+
+        // 1. Compute net balance per member
+        // Positive = net creditor (is owed money), Negative = net debtor (owes money)
+        const netMap: Record<string, number> = {};
+        for (const b of rawBalances) {
+            const payer = b.payerId;  // person who owes
+            const payee = b.payeeId;  // person who is owed
+            netMap[payer] = (netMap[payer] || 0) - b.amount;
+            netMap[payee] = (netMap[payee] || 0) + b.amount;
+        }
+
+        // 2. Separate into creditors (positive) and debtors (negative)
+        const creditors: { userId: string; amount: number }[] = [];
+        const debtors: { userId: string; amount: number }[] = [];
+
+        for (const [userId, net] of Object.entries(netMap)) {
+            if (net > 0.01) {
+                creditors.push({ userId, amount: net });
+            } else if (net < -0.01) {
+                debtors.push({ userId, amount: -net }); // store as positive
+            }
+        }
+
+        // 3. Greedy algorithm: match largest debtor with largest creditor
+        creditors.sort((a, b) => b.amount - a.amount);
+        debtors.sort((a, b) => b.amount - a.amount);
+
+        const simplified: { from: string; to: string; amount: number }[] = [];
+        let ci = 0, di = 0;
+
+        while (ci < creditors.length && di < debtors.length) {
+            const transferAmount = Math.min(creditors[ci].amount, debtors[di].amount);
+
+            if (transferAmount > 0.01) {
+                simplified.push({
+                    from: debtors[di].userId,
+                    to: creditors[ci].userId,
+                    amount: Math.round(transferAmount * 100) / 100,
+                });
+            }
+
+            creditors[ci].amount -= transferAmount;
+            debtors[di].amount -= transferAmount;
+
+            if (creditors[ci].amount < 0.01) ci++;
+            if (debtors[di].amount < 0.01) di++;
+        }
+
+        // 4. Enrich with group name and user info
+        const group = await Group.findById(groupId).select("groupName").lean();
+        const groupName = (group as any)?.groupName || "";
+
+        // Collect all user IDs involved
+        const userIds = new Set<string>();
+        simplified.forEach(s => { userIds.add(s.from); userIds.add(s.to); });
+
+        const { User } = await import("../models/User");
+        const users = await User.find({ authId: { $in: [...userIds] } }).lean();
+        const userLookup: Record<string, any> = {};
+        for (const u of users) {
+            userLookup[(u as any).authId] = u;
+        }
+
+        const enrichedSimplified = simplified.map(s => ({
+            ...s,
+            groupId,
+            groupName,
+            fromName: (userLookup[s.from] as any)?.displayName || (userLookup[s.from] as any)?.username || s.from.substring(0, 8),
+            toName: (userLookup[s.to] as any)?.displayName || (userLookup[s.to] as any)?.username || s.to.substring(0, 8),
+            fromAvatar: (userLookup[s.from] as any)?.avatar || "",
+            toAvatar: (userLookup[s.to] as any)?.avatar || "",
+            toUpiId: (userLookup[s.to] as any)?.upiId || "",
+        }));
+
+        // Also return the raw OwedBorrow IDs so the frontend can settle the underlying records
+        // Map: for each simplified transaction (from→to), find the raw OwedBorrow records that contribute
+        const rawMapping = simplified.map(s => {
+            // Find all raw balances where 'from' owes 'to' (directly or indirectly via net calculation)
+            return rawBalances
+                .filter((b: any) => b.payerId === s.from || b.payeeId === s.to)
+                .map((b: any) => String(b._id));
+        });
+
+        return {
+            simplified: enrichedSimplified,
+            rawBalances: rawBalances.map((b: any) => ({
+                ...b,
+                _id: String(b._id),
+                groupName,
+            })),
+            rawMapping,
+        };
+    }
+
     // Delete an expense
     static async deleteExpense(expenseId: string) {
         const expense = await Expense.findById(expenseId);
