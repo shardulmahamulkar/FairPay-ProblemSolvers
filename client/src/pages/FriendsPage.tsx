@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Plus, Search, MoreVertical, UserPlus, Send, Edit, X, Clock } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -12,17 +13,24 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { ApiService } from "@/services/ApiService";
 import { getCurrencySymbol } from "@/lib/currency";
+import { useCurrency } from "@/contexts/CurrencyContext";
+import { useFriends } from "@/hooks/useFriends";
 import { convertAllToBase } from "@/services/exchangeRate";
 
 const FriendsPage = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { defaultCurrency, formatAmount } = useCurrency();
+
+  const { data: friendsHook = [], refetch: refetchFriends } = useFriends(user?.id);
+
   const [search, setSearch] = useState("");
   const [friends, setFriends] = useState<any[]>([]);
   const [friendRequests, setFriendRequests] = useState<any[]>([]);
   const [sentRequests, setSentRequests] = useState<any[]>([]);
   const [friendBalances, setFriendBalances] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // Dialog states
   const [addOpen, setAddOpen] = useState(false);
@@ -37,53 +45,39 @@ const FriendsPage = () => {
   const [addMethod, setAddMethod] = useState<"email" | "username" | "phone">("email");
   const [adding, setAdding] = useState(false);
 
+  useEffect(() => {
+    setFriends(friendsHook);
+  }, [friendsHook]);
+
   const fetchFriends = async () => {
     if (!user?.id) return;
     try {
-      const res = await ApiService.get(`/api/friends/user/${user.id}`);
-      setFriends(res as any[] || []);
-    } catch (err) {
-      console.error("Friends fetch error:", err);
-    }
-    try {
-      const reqRes = await ApiService.get(`/api/friends/requests/${user.id}`);
-      setFriendRequests(reqRes as any[] || []);
-    } catch (err) {
-      console.warn("Requests fetch error (may not be deployed yet):", err);
-    }
-    // Fetch outgoing sent requests
-    try {
-      const sentRes = await ApiService.get(`/api/friends/sent/${user.id}`);
+      refetchFriends();
+      const [reqsRes, sentRes, summaryRes] = await Promise.all([
+        ApiService.get(`/api/friends/requests/${user.id}`),
+        ApiService.get(`/api/friends/sent/${user.id}`),
+        ApiService.get(`/api/expenses/summary/${user.id}`),
+      ]);
+      setFriendRequests(reqsRes as any[] || []);
       setSentRequests(sentRes as any[] || []);
-    } catch (err) {
-      console.warn("Sent requests fetch error:", err);
-    }
-    // Fetch summary to compute converted per-friend balances
-    try {
-      const summaryRes: any = await ApiService.get(`/api/expenses/summary/${user.id}`);
-      const owedDocs = summaryRes.owedDocs || [];
-      const receivableDocs = summaryRes.receivableDocs || [];
-      const convertedOwed = await convertAllToBase(
-        owedDocs.map((d: any) => ({ amount: d.amount, currency: d.currency || "INR" }))
-      );
-      const convertedReceivable = await convertAllToBase(
-        receivableDocs.map((d: any) => ({ amount: d.amount, currency: d.currency || "INR" }))
-      );
+
+      const owedDocs = (summaryRes as any).owedDocs || [];
+      const receivableDocs = (summaryRes as any).receivableDocs || [];
+      const convertedOwed = await convertAllToBase(owedDocs.map((d: any) => ({ amount: d.amount, currency: d.currency || "INR" })), defaultCurrency);
+      const convertedReceivable = await convertAllToBase(receivableDocs.map((d: any) => ({ amount: d.amount, currency: d.currency || "INR" })), defaultCurrency);
+
       const balMap: Record<string, number> = {};
-      receivableDocs.forEach((d: any, i: number) => {
-        balMap[d.payerId] = (balMap[d.payerId] || 0) + convertedReceivable[i].convertedAmount;
-      });
-      owedDocs.forEach((d: any, i: number) => {
-        balMap[d.payeeId] = (balMap[d.payeeId] || 0) - convertedOwed[i].convertedAmount;
-      });
+      receivableDocs.forEach((d: any, i: number) => { balMap[d.payerId] = (balMap[d.payerId] || 0) + convertedReceivable[i].convertedAmount; });
+      owedDocs.forEach((d: any, i: number) => { balMap[d.payeeId] = (balMap[d.payeeId] || 0) - convertedOwed[i].convertedAmount; });
       setFriendBalances(balMap);
     } catch (err) {
-      console.error("Summary fetch error:", err);
+      console.error(err);
     }
-    setLoading(false);
   };
 
-  useEffect(() => { fetchFriends(); }, [user]);
+  useEffect(() => {
+    fetchFriends();
+  }, [user, defaultCurrency]);
 
   const filteredFriends = friends.filter((f) => {
     const name = f.displayName || f.username || "";
@@ -217,7 +211,7 @@ const FriendsPage = () => {
           {friendRequests.map((req) => (
             <Card key={req._id} className="flex items-center justify-between p-3 rounded-xl border-0 shadow-sm">
               <div className="flex items-center gap-3">
-                {req.avatar?.startsWith("http") ? (
+                {(req.avatar?.startsWith("http") || req.avatar?.startsWith("data:")) ? (
                   <img src={req.avatar} alt={req.username} className="w-10 h-10 rounded-full object-cover" />
                 ) : (
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
@@ -241,7 +235,7 @@ const FriendsPage = () => {
       <div className="space-y-2">
         {filteredFriends.map((friend) => {
           const name = friend.displayName || friend.username || friend.friendId.substring(0, 8);
-          const isImgAvatar = friend.avatar?.startsWith("http");
+          const isImgAvatar = friend.avatar?.startsWith("http") || friend.avatar?.startsWith("data:");
           return (
             <Card key={friend._id} className="flex items-center justify-between p-3 rounded-xl border-0 shadow-sm">
               <div className="flex items-center gap-3">
@@ -306,7 +300,7 @@ const FriendsPage = () => {
           {sentRequests.map((req) => (
             <Card key={req._id} className="flex items-center justify-between p-3 rounded-xl border-0 shadow-sm">
               <div className="flex items-center gap-3">
-                {req.avatar?.startsWith("http") ? (
+                {(req.avatar?.startsWith("http") || req.avatar?.startsWith("data:")) ? (
                   <img src={req.avatar} alt={req.username} className="w-10 h-10 rounded-full object-cover" />
                 ) : (
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
@@ -337,7 +331,7 @@ const FriendsPage = () => {
           {selectedFriend && (
             <div className="space-y-4">
               <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
-                {selectedFriend.avatar?.startsWith("http") ? (
+                {(selectedFriend.avatar?.startsWith("http") || selectedFriend.avatar?.startsWith("data:")) ? (
                   <img src={selectedFriend.avatar} alt="" className="w-12 h-12 rounded-full object-cover" />
                 ) : (
                   <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-lg font-bold text-primary">

@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Sync user to MongoDB for friend lookups
         try {
           const { ApiService } = await import("@/services/ApiService");
-          await ApiService.post("/api/users/sync", {
+          const dbUser = await ApiService.post("/api/users/sync", {
             authId: fbUser.uid,
             username: authUser.username,
             displayName: authUser.name,
@@ -114,7 +114,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const firebaseUpdates: { displayName?: string; photoURL?: string } = {};
         if (updates.name) firebaseUpdates.displayName = updates.name;
-        if (typeof updates.avatar === "string" && updates.avatar.startsWith("http"))
+        if (typeof updates.avatar === "string" && (updates.avatar.startsWith("http") || updates.avatar.startsWith("data:")))
           firebaseUpdates.photoURL = updates.avatar;
 
         if (Object.keys(firebaseUpdates).length > 0) {

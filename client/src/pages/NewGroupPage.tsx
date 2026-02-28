@@ -231,7 +231,7 @@ const NewGroupPage = () => {
           <div className="space-y-2">
             {/* Current user always included */}
             <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary">
-              {currentUser.avatar?.startsWith("http") ? (
+              {(currentUser.avatar?.startsWith("http") || currentUser.avatar?.startsWith("data:")) ? (
                 <img src={currentUser.avatar} alt={currentUser.name} className="w-8 h-8 rounded-full object-cover" />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">{currentUser.avatar}</div>
@@ -255,7 +255,7 @@ const NewGroupPage = () => {
               const selected = form.members.includes(friend.friendId);
               const role = form.roles[friend.friendId] || "member";
               const name = friend.displayName || friend.username || friend.friendId.substring(0, 8);
-              const isImgAvatar = friend.avatar?.startsWith("http");
+              const isImgAvatar = friend.avatar?.startsWith("http") || friend.avatar?.startsWith("data:");
               return (
                 <div
                   key={friend.friendId}

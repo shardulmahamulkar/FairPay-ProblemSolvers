@@ -12,6 +12,9 @@ import { getCurrencySymbol } from "@/lib/currency";
 import { convertAllToBase } from "@/services/exchangeRate";
 import { ExpenseDetailsDialog } from "@/components/ExpenseDetailsDialog";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useToast } from "@/hooks/use-toast";
+import { useGroups } from "@/hooks/useGroups";
+import { useFriends } from "@/hooks/useFriends";
 
 const speedTiles = [
   { icon: Plus, label: "New Expense", path: "/expenses/new" },
@@ -23,88 +26,98 @@ const speedTiles = [
 const HomePage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [groups, setGroups] = useState<any[]>([]);
+  const { toast } = useToast();
+  const { defaultCurrency, formatAmount } = useCurrency();
+
+  const { data: groups = [], isLoading: groupsLoading } = useGroups(user?.id);
+  const { data: friendsHook = [], isLoading: friendsLoading } = useFriends(user?.id);
+
   const [summary, setSummary] = useState<{ totalOwed: number; totalReceivable: number }>({ totalOwed: 0, totalReceivable: 0 });
   const [recentExpenses, setRecentExpenses] = useState<any[]>([]);
   const [friends, setFriends] = useState<any[]>([]);
   const [friendBalances, setFriendBalances] = useState<Record<string, number>>({});
   const [userAvatars, setUserAvatars] = useState<Record<string, string>>({});
   const [userNames, setUserNames] = useState<Record<string, string>>({});
-  const { defaultCurrency, formatAmount } = useCurrency();
 
   useEffect(() => {
+    if (friendsHook.length > 0) {
+      setFriends(friendsHook.slice(0, 5));
+    }
+  }, [friendsHook]);
+
+  const fetchNames = async () => {
+    if (groups.length === 0) return;
+    const ids = new Set<string>();
+    groups.forEach((g: any) => g.members?.forEach((m: any) => ids.add(m.userId)));
+    const nameMap: Record<string, string> = {};
+    const avatarMap: Record<string, string> = {};
+    await Promise.all(
+      [...ids].map(async (uid) => {
+        if (uid === user?.id) {
+          nameMap[uid] = user.name || "You";
+          avatarMap[uid] = user.avatar || "";
+          return;
+        }
+        try {
+          const u: any = await ApiService.get(`/api/users/${uid}`);
+          nameMap[uid] = u.username || uid.substring(0, 8);
+          avatarMap[uid] = u.avatar || "";
+        } catch {
+          nameMap[uid] = uid.substring(0, 8);
+        }
+      })
+    );
+    setUserNames(nameMap);
+    setUserAvatars(avatarMap);
+  };
+
+  const fetchBalancesSummary = async () => {
     if (!user?.id) return;
+    try {
+      const res: any = await ApiService.get(`/api/expenses/summary/${user.id}`);
+      const owedDocs = res.owedDocs || [];
+      const receivableDocs = res.receivableDocs || [];
 
-    ApiService.get(`/api/groups/user/${user.id}`)
-      .then(async (res: any) => {
-        setGroups(res || []);
-        const ids = new Set<string>();
-        (res || []).forEach((g: any) => g.members?.forEach((m: any) => ids.add(m.userId)));
-        const avatarMap: Record<string, string> = {};
-        const nameMap: Record<string, string> = {};
-        await Promise.all([...ids].map(async (uid) => {
-          if (uid === user?.id) {
-            nameMap[uid] = user.name || "You";
-            avatarMap[uid] = user.avatar || "";
-            return;
-          }
-          try {
-            const u: any = await ApiService.get(`/api/users/${uid}`);
-            nameMap[uid] = u.username || uid.substring(0, 8);
-            avatarMap[uid] = u.avatar || "";
-          } catch {
-            nameMap[uid] = uid.substring(0, 8);
-          }
-        }));
-        setUserAvatars(avatarMap);
-        setUserNames(nameMap);
-      })
-      .catch(console.error);
+      // Convert each debt to defaultCurrency
+      const convertedOwed = await convertAllToBase(
+        owedDocs.map((d: any) => ({ amount: d.amount, currency: d.currency || "INR" })),
+        defaultCurrency
+      );
+      const convertedReceivable = await convertAllToBase(
+        receivableDocs.map((d: any) => ({ amount: d.amount, currency: d.currency || "INR" })),
+        defaultCurrency
+      );
 
-    // Fetch summary and convert all amounts to INR using live exchange rates
-    ApiService.get(`/api/expenses/summary/${user.id}`)
-      .then(async (res: any) => {
-        const owedDocs = res.owedDocs || [];
-        const receivableDocs = res.receivableDocs || [];
+      const totalOwed = convertedOwed.reduce((sum, d) => sum + d.convertedAmount, 0);
+      const totalReceivable = convertedReceivable.reduce((sum, d) => sum + d.convertedAmount, 0);
 
-        // Convert each debt to defaultCurrency
-        const convertedOwed = await convertAllToBase(
-          owedDocs.map((d: any) => ({ amount: d.amount, currency: d.currency || "INR" })),
-          defaultCurrency
-        );
-        const convertedReceivable = await convertAllToBase(
-          receivableDocs.map((d: any) => ({ amount: d.amount, currency: d.currency || "INR" })),
-          defaultCurrency
-        );
+      setSummary({ totalOwed, totalReceivable });
 
-        const totalOwed = convertedOwed.reduce((sum, d) => sum + d.convertedAmount, 0);
-        const totalReceivable = convertedReceivable.reduce((sum, d) => sum + d.convertedAmount, 0);
+      // Build per-friend converted balances
+      const balMap: Record<string, number> = {};
+      receivableDocs.forEach((d: any, i: number) => {
+        balMap[d.payerId] = (balMap[d.payerId] || 0) + convertedReceivable[i].convertedAmount;
+      });
+      owedDocs.forEach((d: any, i: number) => {
+        balMap[d.payeeId] = (balMap[d.payeeId] || 0) - convertedOwed[i].convertedAmount;
+      });
+      setFriendBalances(balMap);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-        setSummary({ totalOwed, totalReceivable });
+  useEffect(() => {
+    if (groups.length > 0) fetchNames();
+  }, [groups]);
 
-        // Build per-friend converted balances
-        const balMap: Record<string, number> = {};
-        // They owe you (positive): receivableDocs where payerId is the friend
-        receivableDocs.forEach((d: any, i: number) => {
-          const friendId = d.payerId;
-          balMap[friendId] = (balMap[friendId] || 0) + convertedReceivable[i].convertedAmount;
-        });
-        // You owe them (negative): owedDocs where payeeId is the friend
-        owedDocs.forEach((d: any, i: number) => {
-          const friendId = d.payeeId;
-          balMap[friendId] = (balMap[friendId] || 0) - convertedOwed[i].convertedAmount;
-        });
-        setFriendBalances(balMap);
-      })
-      .catch(console.error);
-
-    ApiService.get(`/api/expenses/user/${user.id}`)
-      .then((res: any) => setRecentExpenses((res || []).slice(0, 4)))
-      .catch(console.error);
-
-    ApiService.get(`/api/friends/user/${user.id}`)
-      .then((res: any) => setFriends((res || []).slice(0, 5)))
-      .catch(console.error);
+  useEffect(() => {
+    if (user?.id) {
+      fetchBalancesSummary();
+      ApiService.get(`/api/expenses/user/${user.id}`)
+        .then((res: any) => setRecentExpenses((res || []).slice(0, 4)))
+        .catch(console.error);
+    }
   }, [user, defaultCurrency]);
 
   const activeGroups = groups.filter(g => !g.isArchived);
@@ -208,7 +221,7 @@ const HomePage = () => {
                     {group.members?.slice(0, 3).map((m: any) => {
                       const avatar = userAvatars[m.userId];
                       const name = userNames[m.userId] || (m.userId === user?.id ? (user?.name || "Y") : (m.userId || "U"));
-                      return avatar && avatar.startsWith("http") ? (
+                      return avatar && (avatar.startsWith("http") || avatar.startsWith("data:")) ? (
                         <img key={m.userId || m._id} src={avatar} alt="" className="w-6 h-6 rounded-full object-cover border-2 border-card" />
                       ) : (
                         <div key={m.userId || m._id} className="w-6 h-6 rounded-full bg-secondary border-2 border-card flex items-center justify-center text-[8px] font-bold text-secondary-foreground">
@@ -251,7 +264,7 @@ const HomePage = () => {
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
             {friends.map((friend) => {
               const name = friend.displayName || friend.username || "Friend";
-              const isImg = friend.avatar?.startsWith("http");
+              const isImg = friend.avatar?.startsWith("http") || friend.avatar?.startsWith("data:");
               const convertedBal = friendBalances[friend.friendId] ?? friend.owedAmount;
               return (
                 <div key={friend._id} className="flex flex-col items-center gap-1.5 min-w-[64px] flex-shrink-0">

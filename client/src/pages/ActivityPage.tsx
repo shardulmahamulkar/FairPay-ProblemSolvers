@@ -12,36 +12,63 @@ import { getCategoryIcon, getCategoryColor } from "@/lib/categoryIcons";
 import { getCurrencySymbol } from "@/lib/currency";
 import { ExpenseDetailsDialog } from "@/components/ExpenseDetailsDialog";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useNavigate } from "react-router-dom"; // Added this import
+import { useExpenses } from "@/hooks/useExpenses"; // Added this import
 
 const ActivityPage = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { formatAmount } = useCurrency();
+
+  const { data: allExpenses = [], isLoading, refetch: fetchExpenses } = useExpenses(user?.id);
+
   const [expenses, setExpenses] = useState<any[]>([]);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [groups, setGroups] = useState<any[]>([]);
   const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [selectedExpense, setSelectedExpense] = useState<any | null>(null);
-  const { formatAmount } = useCurrency();
 
   const getName = (uid: string) => {
     if (uid === user?.id) return "You";
     return userNames[uid] || uid.substring(0, 8);
   };
 
-  const fetchData = async () => {
+  const fetchDependencies = async () => {
     if (!user?.id) return;
     try {
-      const [expRes, reqRes] = await Promise.all([
-        ApiService.get(`/api/expenses/user/${user.id}`).catch(() => []),
-        ApiService.get(`/api/balance-requests/pending/${user.id}`).catch(() => []),
-      ]);
-      const expList = expRes as any[] || [];
+      const groupsRes: any = await ApiService.get(`/api/groups/user/${user.id}`);
+      setGroups(groupsRes || []);
+
+      const ids = new Set<string>();
+      (allExpenses || []).forEach((e: any) => {
+        if (e.paidBy) ids.add(e.paidBy);
+        e.splits?.forEach((s: any) => ids.add(s.userId));
+      });
+
+      const nameMap: Record<string, string> = {};
+      await Promise.all(
+        [...ids].map(async (uid) => {
+          if (uid === user.id) { nameMap[uid] = "You"; return; }
+          try {
+            const u: any = await ApiService.get(`/api/users/${uid}`);
+            nameMap[uid] = u.username || uid.substring(0, 8);
+          } catch { nameMap[uid] = uid.substring(0, 8); }
+        })
+      );
+      setUserNames(nameMap);
+    } catch (err) { console.error(err); }
+  };
+
+  const fetchRequests = async () => {
+    if (!user?.id) return;
+    try {
+      const reqRes = await ApiService.get(`/api/balance-requests/pending/${user.id}`).catch(() => []);
       const requests = reqRes as any[] || [];
-      setExpenses(expList);
       setPendingRequests(requests);
 
-      // Resolve names for all unique user IDs (expense payers + request senders)
+      // Resolve names for request senders
       const ids = new Set<string>();
-      expList.forEach((e: any) => { if (e.userId && e.userId !== user?.id) ids.add(e.userId); });
       requests.forEach((r: any) => { if (r.requestedBy !== user?.id) ids.add(r.requestedBy); });
 
       const nameMap: Record<string, string> = {};
@@ -51,17 +78,30 @@ const ActivityPage = () => {
           nameMap[uid] = u.username || u.email?.split("@")[0] || uid.substring(0, 8);
         } catch { nameMap[uid] = uid.substring(0, 8); }
       }));
-      setUserNames(nameMap);
+      setUserNames(prevNames => ({ ...prevNames, ...nameMap })); // Merge with existing names
     } catch (err) { console.error(err); }
   };
 
-  useEffect(() => { fetchData(); }, [user]);
+  useEffect(() => {
+    if (allExpenses.length > 0) {
+      setExpenses(allExpenses);
+      fetchDependencies();
+    }
+  }, [allExpenses, user?.id]); // Added user?.id to dependencies for fetchDependencies
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchExpenses();
+      fetchRequests(); // Fetch requests when user ID is available
+    }
+  }, [user?.id]); // Only re-run when user ID changes
 
   const handleAccept = async (requestId: string) => {
     try {
       await ApiService.post(`/api/balance-requests/${requestId}/accept`, { userId: user?.id });
       toast({ title: "Accepted", description: "Balance updated." });
-      fetchData();
+      fetchExpenses(); // Refresh expenses as balance might change
+      fetchRequests(); // Refresh requests
     } catch (err: any) {
       toast({ variant: "destructive", title: "Error", description: err.message });
     }
@@ -71,7 +111,9 @@ const ActivityPage = () => {
     try {
       await ApiService.post(`/api/balance-requests/${requestId}/reject`, { userId: user?.id });
       toast({ title: "Declined", description: "Request declined." });
-      fetchData();
+      setPendingRequests(prev => prev.filter(r => r._id !== requestId));
+      fetchExpenses();
+      fetchRequests();
     } catch (err: any) {
       toast({ variant: "destructive", title: "Error", description: err.message });
     }

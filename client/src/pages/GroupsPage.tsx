@@ -13,12 +13,16 @@ import { useToast } from "@/hooks/use-toast";
 
 const DEFAULT_BG = "https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?w=400&h=200&fit=crop";
 
+import { useGroups } from "@/hooks/useGroups";
+
 const GroupsPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
-  const [groups, setGroups] = useState<any[]>([]);
+
+  const { data: groups = [], refetch: fetchGroups } = useGroups(user?.id);
+
   const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [userAvatars, setUserAvatars] = useState<Record<string, string>>({});
   const [isArchivedExpanded, setIsArchivedExpanded] = useState(false);
@@ -26,34 +30,29 @@ const GroupsPage = () => {
   const [selectedForDelete, setSelectedForDelete] = useState<Set<string>>(new Set());
   const [massDeleteOpen, setMassDeleteOpen] = useState(false);
 
-  const fetchGroups = () => {
-    if (user?.id) {
-      ApiService.get(`/api/groups/user/${user.id}`)
-        .then(async (res: any) => {
-          setGroups(res || []);
-          // Resolve member names
-          const ids = new Set<string>();
-          (res || []).forEach((g: any) => g.members?.forEach((m: any) => ids.add(m.userId)));
-          const nameMap: Record<string, string> = {};
-          const avatarMap: Record<string, string> = {};
-          await Promise.all(
-            [...ids].map(async (uid) => {
-              if (uid === user?.id) { nameMap[uid] = user.name || "You"; avatarMap[uid] = user.avatar || ""; return; }
-              try {
-                const u: any = await ApiService.get(`/api/users/${uid}`);
-                nameMap[uid] = u.username || uid.substring(0, 8);
-                avatarMap[uid] = u.avatar || "";
-              } catch { nameMap[uid] = uid.substring(0, 8); }
-            })
-          );
-          setUserNames(nameMap);
-          setUserAvatars(avatarMap);
-        })
-        .catch(console.error);
-    }
+  const fetchNamesAndAvatars = async () => {
+    if (groups.length === 0) return;
+    const ids = new Set<string>();
+    groups.forEach((g: any) => g.members?.forEach((m: any) => ids.add(m.userId)));
+    const nameMap: Record<string, string> = {};
+    const avatarMap: Record<string, string> = {};
+    await Promise.all(
+      [...ids].map(async (uid) => {
+        if (uid === user?.id) { nameMap[uid] = user.name || "You"; avatarMap[uid] = user.avatar || ""; return; }
+        try {
+          const u: any = await ApiService.get(`/api/users/${uid}`);
+          nameMap[uid] = u.username || uid.substring(0, 8);
+          avatarMap[uid] = u.avatar || "";
+        } catch { nameMap[uid] = uid.substring(0, 8); }
+      })
+    );
+    setUserNames(nameMap);
+    setUserAvatars(avatarMap);
   };
 
-  useEffect(() => { fetchGroups(); }, [user]);
+  useEffect(() => {
+    if (groups.length > 0) fetchNamesAndAvatars();
+  }, [groups]);
 
   const getName = (uid: string) => {
     if (uid === user?.id) return user?.name?.substring(0, 2).toUpperCase() || "YO";
@@ -152,7 +151,7 @@ const GroupsPage = () => {
               <div className="flex -space-x-2">
                 {group.members?.slice(0, 4).map((m: any) => {
                   const avatar = userAvatars[m.userId] || (m.userId === user?.id ? user?.avatar : null);
-                  return avatar && avatar.startsWith("http") ? (
+                  return avatar && (avatar.startsWith("http") || avatar.startsWith("data:")) ? (
                     <img key={m.userId} src={avatar} alt="" className="w-7 h-7 rounded-full object-cover border-2 border-card" />
                   ) : (
                     <div key={m.userId} className="w-7 h-7 rounded-full bg-secondary border-2 border-card flex items-center justify-center text-[9px] font-bold text-secondary-foreground">
