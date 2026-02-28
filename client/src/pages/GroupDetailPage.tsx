@@ -20,6 +20,7 @@ import {
   Download,
   ChevronDown,
   ChevronUp,
+  Copy,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Card } from "@/components/ui/card";
@@ -596,6 +597,7 @@ const GroupDetailPage = () => {
   const [balances, setBalances] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [userNames, setUserNames] = useState<Record<string, string>>({});
+  const [userAvatars, setUserAvatars] = useState<Record<string, string>>({});
   const [friends, setFriends] = useState<any[]>([]);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
@@ -629,13 +631,57 @@ const GroupDetailPage = () => {
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "upi" | null>(null);
   const [pendingSettleIds, setPendingSettleIds] = useState<Set<string>>(new Set());
   const [selectedExpense, setSelectedExpense] = useState<any | null>(null);
+  const [expandedBalances, setExpandedBalances] = useState<Record<string, boolean>>({});
+  const [userUpiIds, setUserUpiIds] = useState<Record<string, string>>({});
+  const [pendingRequestsMap, setPendingRequestsMap] = useState<Record<string, any>>({});
+  const [upiDesktopFallback, setUpiDesktopFallback] = useState<{ link: string } | null>(null);
   const [expandedBalancePeople, setExpandedBalancePeople] = useState<Record<string, boolean>>({});
   const { defaultCurrency, formatAmount, convertAmount } = useCurrency();
+
+  const aggregatedByOtherUser = useMemo(() => {
+    if (!user?.id) return [];
+    const involved = balances.filter((b: any) => b.payerId === user.id || b.payeeId === user.id);
+    const otherIds = new Set<string>();
+    involved.forEach((b: any) => {
+      const otherId = b.payerId === user.id ? b.payeeId : b.payerId;
+      otherIds.add(otherId);
+    });
+    return [...otherIds].map((otherId) => {
+      const owedByMe = balances.filter((b: any) => b.payerId === user.id && b.payeeId === otherId);
+      const owedByThem = balances.filter((b: any) => b.payerId === otherId && b.payeeId === user.id);
+      const sumOwedByMe = owedByMe.reduce((s: number, b: any) => s + b.amount, 0);
+      const sumOwedByThem = owedByThem.reduce((s: number, b: any) => s + b.amount, 0);
+      const netAmount = sumOwedByThem - sumOwedByMe;
+      const weOwe = netAmount < 0;
+      const settleBalanceRecord = owedByMe.length > 0 ? owedByMe[0] : null;
+      const theyOweMeBalanceRecord = owedByThem.length > 0 ? owedByThem[0] : null;
+      return {
+        otherId,
+        netAmount,
+        weOwe,
+        owedByMeBalances: owedByMe,
+        owedByThemBalances: owedByThem,
+        settleBalanceRecord,
+        theyOweMeBalanceRecord,
+      };
+    }).filter((a) => Math.abs(a.netAmount) > 0.01);
+  }, [balances, user?.id]);
 
   // Resolve user IDs to display names
   const getName = (userId: string) => {
     if (userId === user?.id) return "You";
     return userNames[userId] || userId.substring(0, 8);
+  };
+
+  const isMobileDevice = (): boolean => {
+    return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  };
+
+  const buildUpiLink = (upiId: string, payeeName: string, amount: number): string => {
+    const positiveAmount = Math.abs(amount).toFixed(2);
+    const encodedPa = encodeURIComponent(upiId);
+    const encodedPn = encodeURIComponent(payeeName);
+    return `upi://pay?pa=${encodedPa}&pn=${encodedPn}&am=${positiveAmount}&cu=INR&tn=FairPay%20Settlement`;
   };
 
   const fetchData = async () => {
@@ -657,12 +703,17 @@ const GroupDetailPage = () => {
       try {
         const activityRes: any = await ApiService.get(`/api/balance-requests/activity/${user?.id}`);
         const outgoing = new Set<string>();
+        const reqMap: Record<string, any> = {};
         ((activityRes as any[]) || []).forEach((r: any) => {
-          if (r.requestedBy === user?.id && r.status === "pending" && r.type === "settlement" && r.owedBorrowId) {
-            outgoing.add(String(r.owedBorrowId));
+          if (r.status === "pending" && r.owedBorrowId) {
+            reqMap[String(r.owedBorrowId)] = r;
+            if (r.requestedBy === user?.id && r.type === "settlement") {
+              outgoing.add(String(r.owedBorrowId));
+            }
           }
         });
         setPendingSettleIds(outgoing);
+        setPendingRequestsMap(reqMap);
       } catch { /* ignore */ }
 
       // Resolve member names
@@ -677,24 +728,31 @@ const GroupDetailPage = () => {
         allUserIds.add(b.payeeId);
       });
 
-      // Resolving member names...
+      // Resolving member names and UPI IDs...
       const nameMap: Record<string, string> = {};
+      const avatarMap: Record<string, string> = {};
+      const upiIdMap: Record<string, string> = {};
       await Promise.all(
         [...allUserIds].map(async (uid) => {
           if (uid === user?.id) {
             nameMap[uid] = "You";
+            if (user?.avatar) avatarMap[uid] = user.avatar;
             return;
           }
           try {
             const u: any = await ApiService.get(`/api/users/${uid}`);
             nameMap[uid] =
               u.username || u.email?.split("@")[0] || uid.substring(0, 8);
+            avatarMap[uid] = u.avatar || "";
+            if (u.upiId) upiIdMap[uid] = u.upiId;
           } catch {
             nameMap[uid] = uid.substring(0, 8);
           }
         }),
       );
       setUserNames(nameMap);
+      setUserAvatars(avatarMap);
+      setUserUpiIds(upiIdMap);
 
       // Convert currencies
       let expensesArr = (expensesRes as any[]) || [];
@@ -866,7 +924,7 @@ const GroupDetailPage = () => {
   const spent = stats?.spent || 0;
   const healthScore =
     budget > 0 ? Math.round(((budget - spent) / budget) * 100) : 100;
-  const hasUnsettledBalances = balances.length > 0;
+  const hasUnsettledBalances = aggregatedByOtherUser.length > 0;
 
   const handleEndTrip = async () => {
     try {
@@ -1008,8 +1066,32 @@ const GroupDetailPage = () => {
   };
 
   const handleGroupSettle = async () => {
-    if (!settleBalance || !user?.id || !paymentMethod) return;
+    if (!settleBalance || !user?.id) return;
+    const isRequestOnly = settleBalance.payeeId === user.id;
+    const method = isRequestOnly ? "cash" : (paymentMethod || null);
+    if (!isRequestOnly && !method) return;
     try {
+      if (!isRequestOnly && method === "upi") {
+        const receiverId = settleBalance.payeeId;
+        const receiverUpiId = userUpiIds[receiverId];
+        if (!receiverUpiId) {
+          toast({ variant: "destructive", title: "UPI ID Missing", description: "Receiver has not set their UPI ID in profile." });
+          return;
+        }
+        const receiverName = getName(receiverId);
+        const upiLink = buildUpiLink(receiverUpiId, receiverName, settleBalance.amount);
+        if (isMobileDevice()) {
+          window.location.href = upiLink;
+        } else {
+          setUpiDesktopFallback({ link: upiLink });
+        }
+      }
+
+      await ApiService.post("/api/balance-requests/settle", {
+        owedBorrowId: settleBalance._id,
+        requestedBy: user.id,
+        paymentMethod: method || "cash",
+      });
       // Settle All: settle every owed balance in the group
       if (settleBalance.__settleAll) {
         const owedBalances = balances.filter((b) => b.payerId === user.id && !pendingSettleIds.has(String(b._id)));
@@ -1038,10 +1120,10 @@ const GroupDetailPage = () => {
       }
       setSettleBalance(null);
       setPaymentMethod(null);
-      if (paymentMethod === "upi") {
-        toast({ title: "Settled via UPI", description: "Payment marked as completed." });
+      if (!isRequestOnly && method === "upi") {
+        toast({ title: "Settlement Processing", description: "UPI payment initiated. Waiting for confirmation." });
       } else {
-        toast({ title: "Settlement Requested", description: "Waiting for the other party to acknowledge." });
+        toast({ title: "Settlement Requested", description: isRequestOnly ? "They will be notified to complete the payment." : "Waiting for the other party to acknowledge." });
       }
       fetchData();
     } catch (err: any) {
@@ -1098,6 +1180,7 @@ const GroupDetailPage = () => {
         title: "Dispute Filed",
         description: "The other party will be asked to review.",
       });
+      fetchData();
     } catch (err: any) {
       toast({
         variant: "destructive",
@@ -1289,8 +1372,241 @@ const GroupDetailPage = () => {
           />
         </TabsContent>
 
+        {/* Balances Tab — person-wise net, expanded: all unsettled expenses, per-expense and net settlement */}
         {/* Balances Tab — grouped by person, SettleHub-style layout */}
         <TabsContent value="balances" className="space-y-3 mt-4">
+          {aggregatedByOtherUser.length === 0 && (
+            <div className="text-center py-10 space-y-2">
+              <p className="text-3xl">🎉</p>
+              <p className="text-sm font-medium text-muted-foreground">All settled</p>
+            </div>
+          )}
+
+          {aggregatedByOtherUser.map((agg) => {
+            const isExpanded = !!expandedBalances[agg.otherId];
+            const { otherId, netAmount, weOwe, settleBalanceRecord, theyOweMeBalanceRecord } = agg;
+            const displayAmount = Math.abs(netAmount);
+
+            const relevantExpenses = expenses
+              .filter((exp: any) => {
+                if (exp.status === "settled" || exp.status === "cleared") return false;
+                const otherInvolved = exp.participatorsInvolved?.some((p: any) => p.userId === otherId);
+                const iAmInvolved = exp.participatorsInvolved?.some((p: any) => p.userId === user?.id);
+                return (exp.userId === user?.id && otherInvolved) || (exp.userId === otherId && iAmInvolved);
+              })
+              .map((exp: any) => {
+                const yourShare = exp.participatorsInvolved?.find((p: any) => p.userId === user?.id)?.amount ?? 0;
+                const theirShare = exp.participatorsInvolved?.find((p: any) => p.userId === otherId)?.amount ?? 0;
+                const weOweForExpense = exp.userId === otherId && (exp.participatorsInvolved?.some((p: any) => p.userId === user?.id) ?? false);
+                const splitAmount = weOweForExpense ? yourShare : theirShare;
+                const status = exp.status === "disputed" ? "disputed" : exp.status === "settled" || exp.status === "cleared" ? "settled" : "pending";
+                return { exp, weOweForExpense, splitAmount, yourShare, theirShare, status };
+              })
+              .filter((item: any) => (item.yourShare > 0.01 || item.theirShare > 0.01))
+              .sort((a: any, b: any) => new Date(b.exp.expenseTime || 0).getTime() - new Date(a.exp.expenseTime || 0).getTime());
+
+            const isPendingSettle = settleBalanceRecord && pendingSettleIds.has(String(settleBalanceRecord._id));
+            const isPendingTheyOwe = theyOweMeBalanceRecord && pendingSettleIds.has(String(theyOweMeBalanceRecord._id));
+            const avatar = userAvatars[otherId];
+            const groupName = group?.groupName ?? "Group";
+
+            return (
+              <Card key={otherId} className="rounded-xl border-0 shadow-sm overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setExpandedBalances((prev) => ({ ...prev, [otherId]: !prev[otherId] }))}
+                  className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    {(avatar?.startsWith("http") || avatar?.startsWith("data:")) ? (
+                      <img src={avatar} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary flex-shrink-0">
+                        {(getName(otherId) || "?").substring(0, 2).toUpperCase()}
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{getName(otherId)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {weOwe ? "You owe" : "They owe you"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className={cn("font-bold text-base", weOwe ? "text-owed" : "text-receive")}>
+                      {weOwe ? "-" : "+"}{formatAmount(displayAmount, defaultCurrency)}
+                    </span>
+                    {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                  </div>
+                </button>
+
+                <div
+                  className={cn(
+                    "grid transition-[grid-template-rows] duration-300 ease-in-out",
+                    isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                  )}
+                >
+                  <div className="overflow-hidden">
+                    <div className="border-t border-border/40 bg-muted/5">
+                      {/* Net settlement at top */}
+                      {displayAmount > 0.01 && (
+                        <div className="px-4 py-3 border-b border-border/30">
+                          {weOwe && settleBalanceRecord ? (
+                            <div className="flex gap-2">
+                              {isPendingSettle ? (
+                                <span className="flex-1 h-9 rounded-xl bg-muted text-muted-foreground inline-flex items-center justify-center gap-1.5 text-xs font-semibold">
+                                  <Clock className="w-3.5 h-3.5" /> Awaiting Acknowledgement
+                                </span>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  className="flex-1 rounded-xl h-9 text-xs font-bold bg-receive hover:bg-receive/90 text-white"
+                                  onClick={(e) => { e.stopPropagation(); setSettleBalance(settleBalanceRecord); }}
+                                >
+                                  <Check className="w-3.5 h-3.5 mr-1.5" /> Settle Net Amount
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="rounded-xl h-9 text-xs font-bold text-owed border-owed/30"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDisputeBalance(settleBalanceRecord);
+                                  setDisputeForm({ reason: "", proposedAmount: String(settleBalanceRecord.amount) });
+                                }}
+                              >
+                                <Flag className="w-3.5 h-3.5 mr-1.5" /> Dispute
+                              </Button>
+                            </div>
+                          ) : theyOweMeBalanceRecord ? (
+                            <div className="flex gap-2">
+                              {isPendingTheyOwe ? (
+                                <span className="flex-1 h-9 rounded-xl bg-muted text-muted-foreground inline-flex items-center justify-center gap-1.5 text-xs font-semibold">
+                                  <Clock className="w-3.5 h-3.5" /> Awaiting Payment
+                                </span>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  className="flex-1 rounded-xl h-9 text-xs font-bold bg-receive/90 hover:bg-receive text-white"
+                                  onClick={(e) => { e.stopPropagation(); setSettleBalance(theyOweMeBalanceRecord); }}
+                                >
+                                  <Clock className="w-3.5 h-3.5 mr-1.5" /> Request Net Settlement
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="rounded-xl h-9 text-xs font-bold text-owed border-owed/30"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDisputeBalance(theyOweMeBalanceRecord);
+                                  setDisputeForm({ reason: "", proposedAmount: String(theyOweMeBalanceRecord.amount) });
+                                }}
+                              >
+                                <Flag className="w-3.5 h-3.5 mr-1.5" /> Dispute
+                              </Button>
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
+
+                      {/* All unsettled expenses */}
+                      <div className="divide-y divide-border/20">
+                        {relevantExpenses.length > 0 ? (
+                          relevantExpenses.map(({ exp, weOweForExpense, splitAmount, yourShare, theirShare, status }) => {
+                            const expPending = (weOweForExpense && isPendingSettle) || (!weOweForExpense && isPendingTheyOwe);
+                            const dateStr = exp.expenseTime ? new Date(exp.expenseTime).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
+                            return (
+                              <div key={exp._id} className="px-4 py-3 hover:bg-muted/10 transition-colors">
+                                <div className="flex justify-between items-start gap-2 mb-2">
+                                  <h4 className="text-sm font-semibold text-foreground truncate flex-1">
+                                    {exp.expenseNote || "Expense"}
+                                  </h4>
+                                  <span className="text-xs text-muted-foreground flex-shrink-0">{dateStr}</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mb-2">{groupName}</p>
+                                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs mb-3">
+                                  <span>Total: <strong>{formatAmount(exp.amount, defaultCurrency)}</strong></span>
+                                  <span>My share: <strong>{formatAmount(yourShare, defaultCurrency)}</strong></span>
+                                  <span className={cn(
+                                    "font-medium uppercase",
+                                    status === "disputed" ? "text-orange-600" : status === "settled" ? "text-muted-foreground" : "text-primary"
+                                  )}>
+                                    {status}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                  {weOweForExpense && settleBalanceRecord ? (
+                                    <>
+                                      {expPending ? (
+                                        <span className="h-8 px-3 rounded-xl bg-muted text-muted-foreground inline-flex items-center gap-1 text-xs font-medium">
+                                          <Clock className="w-3 h-3" /> Pending
+                                        </span>
+                                      ) : (
+                                        <>
+                                          <Button
+                                            size="sm"
+                                            className="h-8 rounded-xl text-xs font-semibold bg-receive hover:bg-receive/90 text-white"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSettleBalance({ _id: settleBalanceRecord._id, payeeId: settleBalanceRecord.payeeId, amount: splitAmount });
+                                            }}
+                                          >
+                                            <Check className="w-3 h-3 mr-1" /> Settle
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-8 rounded-xl text-xs font-semibold text-owed border-owed/30"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setDisputeBalance(settleBalanceRecord);
+                                              setDisputeForm({ reason: "", proposedAmount: String(splitAmount) });
+                                            }}
+                                          >
+                                            <Flag className="w-3 h-3 mr-1" /> Dispute
+                                          </Button>
+                                        </>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <div className="flex items-center gap-2">
+                                      <span className="h-8 px-3 rounded-xl bg-muted/60 text-muted-foreground inline-flex items-center gap-1 text-xs font-medium">
+                                        <Clock className="w-3 h-3" /> Awaiting Payment
+                                      </span>
+                                      {theyOweMeBalanceRecord && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-8 rounded-xl text-xs font-semibold text-owed border-owed/30"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setDisputeBalance(theyOweMeBalanceRecord);
+                                            setDisputeForm({ reason: "", proposedAmount: String(theyOweMeBalanceRecord.amount) });
+                                          }}
+                                        >
+                                          <Flag className="w-3 h-3 mr-1" /> Dispute
+                                        </Button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="px-4 py-6 text-center">
+                            <p className="text-sm text-muted-foreground">All settled</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
           {(() => {
             // Build grouped map: otherPersonId -> { owedItems[], receivableItems[], netBalance }
             const involved = balances.filter((b) => b.payerId === user?.id || b.payeeId === user?.id);
@@ -1827,53 +2143,65 @@ const GroupDetailPage = () => {
       {/* Settle Confirmation Dialog */}
       <Dialog
         open={!!settleBalance}
-        onOpenChange={() => setSettleBalance(null)}
+        onOpenChange={() => { setSettleBalance(null); setPaymentMethod(null); }}
       >
         <DialogContent className="rounded-2xl max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Check className="w-5 h-5 text-receive" /> Confirm Settlement
+              <Check className="w-5 h-5 text-receive" />
+              {settleBalance?.payeeId === user?.id ? "Request Net Settlement" : "Confirm Settlement"}
             </DialogTitle>
             <DialogDescription>
-              Send a settlement request for{" "}
-              <strong>{formatAmount(settleBalance?.amount, defaultCurrency)}</strong>? The
-              other party will receive a notification to confirm in Activity
-              page.
+              {settleBalance?.payeeId === user?.id ? (
+                <>Request <strong>{getName(settleBalance?.payerId)}</strong> to settle <strong>{formatAmount(settleBalance?.amount, defaultCurrency)}</strong>? They will receive a notification.</>
+              ) : (
+                <>Send a settlement request for <strong>{formatAmount(settleBalance?.amount, defaultCurrency)}</strong>? The other party will receive a notification to confirm in Activity page.</>
+              )}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 mt-2">
-            <Label className="text-xs text-muted-foreground">Select Payment Method</Label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => setPaymentMethod("upi")}
-                className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${paymentMethod === "upi" ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50 text-muted-foreground"}`}
-              >
-                <Smartphone className="w-6 h-6" />
-                <span className="text-sm font-medium">UPI</span>
-              </button>
-              <button
-                onClick={() => setPaymentMethod("cash")}
-                className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${paymentMethod === "cash" ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50 text-muted-foreground"}`}
-              >
-                <Banknote className="w-6 h-6" />
-                <span className="text-sm font-medium">Cash</span>
-              </button>
+          {settleBalance?.payeeId !== user?.id && (
+            <div className="space-y-3 mt-2">
+              <Label className="text-xs text-muted-foreground">Select Payment Method</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => {
+                    const receiverId = settleBalance?.payeeId;
+                    const hasUpi = receiverId && userUpiIds[receiverId];
+                    if (!hasUpi) {
+                      toast({ variant: "destructive", title: "UPI ID Missing", description: "Receiver has not set their UPI ID in profile." });
+                      return;
+                    }
+                    setPaymentMethod("upi");
+                  }}
+                  className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${paymentMethod === "upi" ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50 text-muted-foreground"} ${!(settleBalance && userUpiIds[settleBalance?.payeeId]) && "opacity-50 cursor-not-allowed"}`}
+                >
+                  <Smartphone className="w-6 h-6" />
+                  <span className="text-sm font-medium">UPI</span>
+                </button>
+                <button
+                  onClick={() => setPaymentMethod("cash")}
+                  className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${paymentMethod === "cash" ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50 text-muted-foreground"}`}
+                >
+                  <Banknote className="w-6 h-6" />
+                  <span className="text-sm font-medium">Cash</span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
           <DialogFooter className="mt-4">
             <Button
               variant="outline"
-              onClick={() => setSettleBalance(null)}
+              onClick={() => { setSettleBalance(null); setPaymentMethod(null); }}
               className="rounded-xl"
             >
               Cancel
             </Button>
             <Button
               onClick={handleGroupSettle}
-              disabled={!paymentMethod}
+              disabled={settleBalance?.payeeId !== user?.id && !paymentMethod}
               className="rounded-xl bg-receive hover:bg-receive/90 text-white"
             >
-              Confirm Settlement
+              {settleBalance?.payeeId === user?.id ? "Request Net Settlement" : "Confirm Settlement"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2024,6 +2352,46 @@ const GroupDetailPage = () => {
         onOpenChange={(open) => !open && setSelectedExpense(null)}
         getName={getName}
       />
+      {/* UPI Desktop Fallback Dialog */}
+      <Dialog open={!!upiDesktopFallback} onOpenChange={() => setUpiDesktopFallback(null)}>
+        <DialogContent className="rounded-2xl max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Smartphone className="w-5 h-5 text-primary" /> UPI Payment
+            </DialogTitle>
+            <DialogDescription>
+              UPI payments can be completed only on mobile device.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <Label className="text-xs text-muted-foreground">UPI Payment Link</Label>
+            <div className="flex gap-2">
+              <Input
+                readOnly
+                value={upiDesktopFallback?.link || ""}
+                className="rounded-xl text-xs flex-1"
+                onClick={(e) => (e.target as HTMLInputElement).select()}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-xl h-9 px-3"
+                onClick={() => {
+                  if (upiDesktopFallback?.link) {
+                    navigator.clipboard.writeText(upiDesktopFallback.link);
+                    toast({ title: "Copied!", description: "UPI link copied to clipboard." });
+                  }
+                }}
+              >
+                <Copy className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button onClick={() => setUpiDesktopFallback(null)} className="rounded-xl">Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
