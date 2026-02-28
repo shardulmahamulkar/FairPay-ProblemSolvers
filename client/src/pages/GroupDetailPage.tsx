@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -18,6 +18,8 @@ import {
   Smartphone,
   Clock,
   Download,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Card } from "@/components/ui/card";
@@ -627,6 +629,7 @@ const GroupDetailPage = () => {
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "upi" | null>(null);
   const [pendingSettleIds, setPendingSettleIds] = useState<Set<string>>(new Set());
   const [selectedExpense, setSelectedExpense] = useState<any | null>(null);
+  const [expandedBalancePeople, setExpandedBalancePeople] = useState<Record<string, boolean>>({});
   const { defaultCurrency, formatAmount, convertAmount } = useCurrency();
 
   // Resolve user IDs to display names
@@ -1007,11 +1010,32 @@ const GroupDetailPage = () => {
   const handleGroupSettle = async () => {
     if (!settleBalance || !user?.id || !paymentMethod) return;
     try {
-      await ApiService.post("/api/balance-requests/settle", {
-        owedBorrowId: settleBalance._id,
-        requestedBy: user.id,
-        paymentMethod,
-      });
+      // Settle All: settle every owed balance in the group
+      if (settleBalance.__settleAll) {
+        const owedBalances = balances.filter((b) => b.payerId === user.id && !pendingSettleIds.has(String(b._id)));
+        await Promise.all(
+          owedBalances.map((b) =>
+            ApiService.post("/api/balance-requests/settle", { owedBorrowId: b._id, requestedBy: user.id, paymentMethod })
+          )
+        );
+      } else if (settleBalance.__personSettle) {
+        // Settle per-person: settle all owed items for one specific person
+        const items: any[] = settleBalance.owedItems || [];
+        await Promise.all(
+          items
+            .filter((b) => !pendingSettleIds.has(String(b._id)))
+            .map((b) =>
+              ApiService.post("/api/balance-requests/settle", { owedBorrowId: b._id, requestedBy: user.id, paymentMethod })
+            )
+        );
+      } else {
+        // Single record settle
+        await ApiService.post("/api/balance-requests/settle", {
+          owedBorrowId: settleBalance._id,
+          requestedBy: user.id,
+          paymentMethod,
+        });
+      }
       setSettleBalance(null);
       setPaymentMethod(null);
       if (paymentMethod === "upi") {
@@ -1026,6 +1050,31 @@ const GroupDetailPage = () => {
         title: "Error",
         description: err.message,
       });
+    }
+  };
+
+
+  // Settle ALL owed balances across all persons at once
+  const handleGroupSettleAll = async () => {
+    if (!user?.id || !paymentMethod) return;
+    const owedBalances = balances.filter((b) => b.payerId === user.id && !pendingSettleIds.has(String(b._id)));
+    if (owedBalances.length === 0) return;
+    try {
+      await Promise.all(
+        owedBalances.map((b) =>
+          ApiService.post("/api/balance-requests/settle", {
+            owedBorrowId: b._id,
+            requestedBy: user.id,
+            paymentMethod,
+          })
+        )
+      );
+      setSettleBalance(null);
+      setPaymentMethod(null);
+      toast({ title: "All Settlements Requested", description: "Waiting for acknowledgements from the other parties." });
+      fetchData();
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Error", description: err.message });
     }
   };
 
@@ -1240,73 +1289,204 @@ const GroupDetailPage = () => {
           />
         </TabsContent>
 
-        {/* Balances Tab — grouped by person, per-record actions + consolidated settle */}
+        {/* Balances Tab — grouped by person, SettleHub-style layout */}
         <TabsContent value="balances" className="space-y-3 mt-4">
-          {balances.filter(
-            (b) => b.payerId === user?.id || b.payeeId === user?.id,
-          ).length === 0 && (
-              <div className="text-center py-8">
-                <p className="text-sm text-muted-foreground">
-                  🎉 All settled! No pending balances involving you.
-                </p>
-              </div>
-            )}
-          {balances
-            .filter((b) => b.payerId === user?.id || b.payeeId === user?.id)
-            .map((b) => (
-              <Card
-                key={b._id}
-                className="p-4 rounded-xl border-0 shadow-sm space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">
-                      {getName(b.payerId)} owes → {getName(b.payeeId)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Pending settlement
-                    </p>
-                  </div>
-                  <span
-                    className={cn(
-                      "font-semibold text-lg",
-                      b.payerId === user?.id ? "text-owed" : "text-receive",
-                    )}
-                  >
-                    {formatAmount(b.amount, defaultCurrency)}
-                  </span>
+          {(() => {
+            // Build grouped map: otherPersonId -> { owedItems[], receivableItems[], netBalance }
+            const involved = balances.filter((b) => b.payerId === user?.id || b.payeeId === user?.id);
+
+            const groupMap: Record<string, { personId: string; owedItems: any[]; receivableItems: any[]; totalYouOwe: number; totalTheyOwe: number }> = {};
+            involved.forEach((b) => {
+              const isYouPayer = b.payerId === user?.id;
+              const otherId = isYouPayer ? b.payeeId : b.payerId;
+              if (!groupMap[otherId]) groupMap[otherId] = { personId: otherId, owedItems: [], receivableItems: [], totalYouOwe: 0, totalTheyOwe: 0 };
+              if (isYouPayer) {
+                groupMap[otherId].owedItems.push(b);
+                groupMap[otherId].totalYouOwe += b.amount;
+              } else {
+                groupMap[otherId].receivableItems.push(b);
+                groupMap[otherId].totalTheyOwe += b.amount;
+              }
+            });
+
+            const groups = Object.values(groupMap).map((g) => ({
+              ...g,
+              netBalance: g.totalTheyOwe - g.totalYouOwe,
+            })).filter((g) => Math.abs(g.netBalance) > 0.01 || g.owedItems.length > 0 || g.receivableItems.length > 0);
+
+            if (groups.length === 0) {
+              return (
+                <div className="text-center py-8">
+                  <p className="text-3xl mb-2">🎉</p>
+                  <p className="text-sm text-muted-foreground">All settled! No pending balances involving you.</p>
                 </div>
-                <div className="flex gap-2">
-                  {pendingSettleIds.has(String(b._id)) ? (
-                    <span className="flex-1 rounded-xl bg-muted text-muted-foreground inline-flex items-center justify-center gap-1 text-sm font-medium py-2">
-                      <Clock className="w-3.5 h-3.5" /> Pending
-                    </span>
-                  ) : (
-                    <Button
-                      size="sm"
-                      className="flex-1 rounded-xl bg-receive hover:bg-receive/90 text-white"
-                      onClick={() => setSettleBalance(b)}
-                    >
-                      <Check className="w-3.5 h-3.5 mr-1" /> Settle
-                    </Button>
-                  )}
+              );
+            }
+
+            const hasAnyOwed = groups.some((g) => g.owedItems.some((b) => !pendingSettleIds.has(String(b._id))));
+            const totalOwed = groups.reduce((s, g) => s + g.totalYouOwe, 0);
+            const totalReceivable = groups.reduce((s, g) => s + g.totalTheyOwe, 0);
+
+            return (
+              <>
+                {/* Summary tiles */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Card className="p-3 rounded-xl border-0 shadow-sm text-center">
+                    <p className="text-xs text-muted-foreground mb-1">You Owe</p>
+                    <p className="text-lg font-bold text-owed">{formatAmount(totalOwed, defaultCurrency)}</p>
+                  </Card>
+                  <Card className="p-3 rounded-xl border-0 shadow-sm text-center">
+                    <p className="text-xs text-muted-foreground mb-1">You're Owed</p>
+                    <p className="text-lg font-bold text-receive">{formatAmount(totalReceivable, defaultCurrency)}</p>
+                  </Card>
+                </div>
+
+                {/* Settle All button */}
+                {hasAnyOwed && (
                   <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1 rounded-xl text-owed border-owed/30"
-                    onClick={() => {
-                      setDisputeBalance(b);
-                      setDisputeForm({
-                        reason: "",
-                        proposedAmount: String(b.amount),
-                      });
-                    }}
+                    className="w-full rounded-xl bg-receive hover:bg-receive/90 text-white"
+                    onClick={() => setSettleBalance({ __settleAll: true, amount: totalOwed })}
                   >
-                    <Flag className="w-3.5 h-3.5 mr-1" /> Dispute
+                    <Check className="w-4 h-4 mr-2" /> Settle All — {formatAmount(totalOwed, defaultCurrency)}
                   </Button>
-                </div>
-              </Card>
-            ))}
+                )}
+
+                {/* Person groups */}
+                {groups.map((g) => {
+                  const isExpanded = expandedBalancePeople[g.personId] !== false;
+                  const isYouOweNet = g.netBalance < 0 || g.totalYouOwe > 0;
+                  const absoluteNet = Math.abs(g.totalYouOwe - g.totalTheyOwe);
+                  const hasPendingOwed = g.owedItems.some((b: any) => pendingSettleIds.has(String(b._id)));
+                  const allOwedPending = g.owedItems.length > 0 && g.owedItems.every((b: any) => pendingSettleIds.has(String(b._id)));
+
+                  return (
+                    <Card key={g.personId} className="rounded-2xl border-0 shadow-sm overflow-hidden">
+                      {/* Person header row */}
+                      <button
+                        onClick={() => setExpandedBalancePeople((prev) => ({ ...prev, [g.personId]: !prev[g.personId] }))}
+                        className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                            {getName(g.personId).substring(0, 2).toUpperCase()}
+                          </div>
+                          <div className="text-left">
+                            <p className="text-sm font-semibold text-foreground">{getName(g.personId)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {[...g.owedItems, ...g.receivableItems].length} balance{[...g.owedItems, ...g.receivableItems].length !== 1 ? "s" : ""}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="text-right">
+                            {g.totalYouOwe > 0 && (
+                              <p className="text-xs font-semibold text-owed">-{formatAmount(g.totalYouOwe, defaultCurrency)}</p>
+                            )}
+                            {g.totalTheyOwe > 0 && (
+                              <p className="text-xs font-semibold text-receive">+{formatAmount(g.totalTheyOwe, defaultCurrency)}</p>
+                            )}
+                          </div>
+                          {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                        </div>
+                      </button>
+
+                      {isExpanded && (
+                        <div>
+                          {/* Person-level action row */}
+                          <div className="px-4 pb-2 border-b border-border/30 mb-1">
+                            {g.owedItems.length > 0 ? (
+                              /* User owes this person — show settle + dispute */
+                              <div className="flex gap-2">
+                                {allOwedPending ? (
+                                  <span className="flex-1 h-8 rounded-xl bg-muted text-muted-foreground inline-flex items-center justify-center gap-1 text-xs font-medium">
+                                    <Clock className="w-3 h-3" /> Settlement Pending
+                                  </span>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    className="flex-1 rounded-xl h-8 text-xs bg-receive hover:bg-receive/90 text-white"
+                                    onClick={(e) => { e.stopPropagation(); setSettleBalance({ __personSettle: true, personId: g.personId, owedItems: g.owedItems, amount: g.totalYouOwe }); }}
+                                  >
+                                    <Check className="w-3 h-3 mr-1" /> Settle {formatAmount(g.totalYouOwe, defaultCurrency)}
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1 rounded-xl h-8 text-xs text-owed border-owed/30"
+                                  onClick={(e) => { e.stopPropagation(); setDisputeBalance(g.owedItems[0]); setDisputeForm({ reason: "", proposedAmount: String(g.totalYouOwe) }); }}
+                                >
+                                  <Flag className="w-3 h-3 mr-1" /> Dispute
+                                </Button>
+                              </div>
+                            ) : (
+                              /* User receives from this person — no settle button */
+                              <span className="h-8 rounded-xl bg-muted text-muted-foreground flex items-center justify-center gap-1 text-xs font-medium w-full">
+                                <Clock className="w-3 h-3" /> Awaiting Payment from {getName(g.personId)}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Individual balance rows */}
+                          <div className="divide-y divide-border/30 bg-muted/10">
+                            {[...g.owedItems, ...g.receivableItems].map((b: any) => {
+                              const youOweThis = b.payerId === user?.id;
+                              return (
+                                <div key={b._id} className="px-5 py-2.5">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex-1 min-w-0 mr-2">
+                                      <p className="text-xs font-medium text-foreground truncate">
+                                        {b.expenseNote || "Group Expense"}
+                                      </p>
+                                      <p className={cn("text-xs mt-0.5", youOweThis ? "text-owed" : "text-receive")}>
+                                        {youOweThis ? "You owe" : "Owes you"} {formatAmount(b.amount, defaultCurrency)}
+                                      </p>
+                                    </div>
+                                    <div className="flex gap-1.5 flex-shrink-0">
+                                      {youOweThis ? (
+                                        <>
+                                          {pendingSettleIds.has(String(b._id)) ? (
+                                            <span className="h-7 px-2.5 text-xs rounded-xl bg-muted text-muted-foreground inline-flex items-center gap-1 font-medium">
+                                              <Clock className="w-3 h-3" /> Pending
+                                            </span>
+                                          ) : (
+                                            <Button
+                                              size="sm"
+                                              className="h-7 px-2.5 text-xs rounded-xl bg-receive hover:bg-receive/90 text-white"
+                                              onClick={(e) => { e.stopPropagation(); setSettleBalance(b); }}
+                                            >
+                                              <Check className="w-3 h-3 mr-1" /> Settle
+                                            </Button>
+                                          )}
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 px-2.5 text-xs rounded-xl text-owed border-owed/30"
+                                            onClick={(e) => { e.stopPropagation(); setDisputeBalance(b); setDisputeForm({ reason: "", proposedAmount: String(b.amount) }); }}
+                                          >
+                                            <Flag className="w-3 h-3 mr-1" /> Dispute
+                                          </Button>
+                                        </>
+                                      ) : (
+                                        /* User receives this — no settle button */
+                                        <span className="h-7 px-2.5 text-xs uppercase rounded-[0.5rem] border border-border/40 text-muted-foreground inline-flex items-center gap-1 font-medium">
+                                          <Clock className="w-3 h-3" /> Awaiting
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
+              </>
+            );
+          })()}
         </TabsContent>
 
 

@@ -2,6 +2,8 @@
 
 FairPay is a modern, cross-platform expense splitting and group settlement application. It simplifies shared finances by allowing friends and groups to track expenses, calculate optimized debts, and settle up easily. The app is built as a hybrid mobile application using web technologies, providing native-like features such as automatic SMS parsing for UPI payments and OTA (Over-The-Air) updates.
 
+Web URL :- https://fair-pay-problem-solvers.vercel.app/
+
 ## Key Features
 
 - **Group & Friend Expense Tracking**: Centralize expenses within groups or split costs individually with friends.
