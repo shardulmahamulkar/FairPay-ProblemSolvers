@@ -41,7 +41,7 @@
     --input: 218 20% 90%;
     --ring: 38 54% 57%;
 
-    --nav-footer: 220 40% 19%;
+    --nav-footer: 200 100% 20%;
     --nav-footer-foreground: 0 0% 100%;
 
     --radius: 0.75rem;
@@ -94,8 +94,8 @@
     --input: 222 50% 18%;
     --ring: 38 54% 57%;
 
-    --nav-footer: 222 50% 12%;
-    --nav-footer-foreground: 36 20% 94%;
+    --nav-footer: 200 100% 20%;
+    --nav-footer-foreground: 0 0% 100%;
 
     --sidebar-background: 222 50% 8%;
     --sidebar-foreground: 36 20% 90%;
