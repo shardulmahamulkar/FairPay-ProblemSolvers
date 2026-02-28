@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Mail, Chrome, Wallet, Loader2, Eye, EyeOff, KeyRound, AlertCircle } from "lucide-react";
+import { Mail, Wallet, Loader2, Eye, EyeOff, KeyRound, AlertCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -23,6 +23,7 @@ import {
   updateProfile as fbUpdateProfile,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import googleLogo from "@/assets/google-symbol.png";
 
 // ─── Magic link redirect URL ──────────────────────────────────────────────────
 const EMAIL_LINK_SETTINGS = {
@@ -221,9 +222,24 @@ const LoginPage = () => {
       }
 
       const cred = await createUserWithEmailAndPassword(auth, email, password);
+      // Wait for AuthContext listener to pick up user before syncing extra properties to mongodb? 
+      // The context will automatically sync default values. Then we can call our custom API directly here.
       if (displayName.trim()) {
         await fbUpdateProfile(cred.user, { displayName: displayName.trim() });
       }
+
+      // Save Display Name to database early if needed, but Context handles it mostly.
+      try {
+        const { ApiService } = await import("@/services/ApiService");
+        await ApiService.post("/api/users/sync", {
+          authId: cred.user.uid,
+          email: email,
+          displayName: displayName.trim()
+        });
+      } catch (err) {
+        console.warn("Failed immediate sync:", err);
+      }
+
       // Send verification email — await so we know it fired before showing the screen
       await sendEmailVerification(cred.user).catch(() => { });
       // Stay on this page; polling useEffect will forward to /onboarding once verified
@@ -604,7 +620,7 @@ const LoginPage = () => {
               <div className="relative flex justify-center"><span className="bg-card px-3 text-xs text-muted-foreground">or</span></div>
             </div>
             <Button onClick={handleGoogleLogin} variant="outline" className="w-full rounded-xl" size="lg" disabled={loggingIn}>
-              <Chrome className="w-4 h-4 mr-2" /> Continue with Google
+              <img src={googleLogo} alt="Google" className="w-4 h-4 mr-2" /> Continue with Google
             </Button>
           </>
         )}

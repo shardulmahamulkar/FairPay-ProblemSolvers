@@ -100,6 +100,11 @@ const NewExpensePage = () => {
   const [scanResult, setScanResult] = useState({ amount: "", note: "", category: "" });
   const [scanProgress, setScanProgress] = useState(0);
 
+  // Live camera state
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
   const selectedGroup = groups.find(g => g._id === form.groupId);
 
   const toggleMember = (id: string) => {
@@ -214,6 +219,52 @@ const NewExpensePage = () => {
     setScanFile(null);
     if (cameraInputRef.current) cameraInputRef.current.value = "";
     if (galleryInputRef.current) galleryInputRef.current.value = "";
+  };
+
+  const handleCameraOpen = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+        audio: false,
+      });
+      streamRef.current = stream;
+      setCameraOpen(true);
+      // Wait for the video element to mount, then attach the stream
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      }, 100);
+    } catch {
+      // Fallback: if getUserMedia fails, use the file input with capture
+      cameraInputRef.current?.click();
+    }
+  };
+
+  const handleCameraCapture = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+    setScanPreview(dataUrl);
+    // Convert to File for scanning
+    canvas.toBlob((blob) => {
+      if (blob) setScanFile(new File([blob], "camera-capture.jpg", { type: "image/jpeg" }));
+    }, "image/jpeg", 0.9);
+    handleCameraClose();
+  };
+
+  const handleCameraClose = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setCameraOpen(false);
   };
 
   return (
@@ -341,7 +392,7 @@ const NewExpensePage = () => {
           {!scanPreview ? (
             <div className="flex gap-2">
               <button
-                onClick={() => cameraInputRef.current?.click()}
+                onClick={handleCameraOpen}
                 className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-muted text-muted-foreground hover:border-primary hover:text-primary transition-colors"
               >
                 <Camera className="w-4 h-4" />
@@ -553,6 +604,35 @@ const NewExpensePage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Live Camera Overlay */}
+      {cameraOpen && (
+        <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="flex-1 object-cover w-full"
+          />
+          <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-8 pb-10 pt-4 bg-gradient-to-t from-black/80 to-transparent">
+            <button
+              onClick={handleCameraClose}
+              className="w-12 h-12 rounded-full bg-white/20 backdrop-blur flex items-center justify-center text-white"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <button
+              onClick={handleCameraCapture}
+              className="w-16 h-16 rounded-full bg-white flex items-center justify-center shadow-lg"
+              style={{ border: "4px solid rgba(255,255,255,0.5)" }}
+            >
+              <div className="w-12 h-12 rounded-full bg-white" />
+            </button>
+            <div className="w-12 h-12" /> {/* spacer for centering */}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

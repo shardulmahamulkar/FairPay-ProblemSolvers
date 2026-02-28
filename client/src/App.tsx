@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import AppLayout from "@/components/layout/AppLayout";
 import SnackbarNotifications from "@/components/SnackbarNotifications";
@@ -34,42 +35,44 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <ThemeProvider>
-          <TooltipProvider>
-            <Toaster />
-            <BrowserRouter>
-              <UndoSnackbar />
-              <Routes>
-                {/* Public routes */}
-                <Route path="/onboarding" element={<OnboardingPage />} />
-                <Route path="/login" element={<LoginPage />} />
+      <CurrencyProvider>
+        <AuthProvider>
+          <ThemeProvider>
+            <TooltipProvider>
+              <Toaster />
+              <BrowserRouter>
+                <UndoSnackbar />
+                <Routes>
+                  {/* Public routes */}
+                  <Route path="/onboarding" element={<OnboardingPage />} />
+                  <Route path="/login" element={<LoginPage />} />
 
-                {/* Protected routes */}
-                <Route element={
-                  <ProtectedRoute>
-                    <SnackbarNotifications />
-                    <AppLayout />
-                  </ProtectedRoute>
-                }>
-                  <Route path="/" element={<HomePage />} />
-                  <Route path="/groups" element={<GroupsPage />} />
-                  <Route path="/groups/new" element={<NewGroupPage />} />
-                  <Route path="/groups/:id" element={<GroupDetailPage />} />
-                  <Route path="/expenses/new" element={<NewExpensePage />} />
-                  <Route path="/friends" element={<FriendsPage />} />
-                  <Route path="/activity" element={<ActivityPage />} />
-                  <Route path="/profile" element={<ProfilePage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="/settle" element={<SettleHubPage />} />
-                </Route>
+                  {/* Protected routes */}
+                  <Route element={
+                    <ProtectedRoute>
+                      <SnackbarNotifications />
+                      <AppLayout />
+                    </ProtectedRoute>
+                  }>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/groups" element={<GroupsPage />} />
+                    <Route path="/groups/new" element={<NewGroupPage />} />
+                    <Route path="/groups/:id" element={<GroupDetailPage />} />
+                    <Route path="/expenses/new" element={<NewExpensePage />} />
+                    <Route path="/friends" element={<FriendsPage />} />
+                    <Route path="/activity" element={<ActivityPage />} />
+                    <Route path="/profile" element={<ProfilePage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/settle" element={<SettleHubPage />} />
+                  </Route>
 
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </TooltipProvider>
-        </ThemeProvider>
-      </AuthProvider>
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </TooltipProvider>
+          </ThemeProvider>
+        </AuthProvider>
+      </CurrencyProvider>
     </QueryClientProvider>
   );
 };

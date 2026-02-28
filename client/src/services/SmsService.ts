@@ -215,4 +215,4 @@ export const SmsService = {
             try { await SmsReceiver.stopWatching(); } catch (e) { /* ignore */ }
         }
     }
-};
+}

@@ -81,6 +81,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             phone: authUser.phone,
             avatar: authUser.avatar,
           });
+          if (dbUser && (dbUser as any).upiId) {
+            setUser((prev) => (prev ? { ...prev, upiId: (dbUser as any).upiId } : null));
+          }
         } catch (e) {
           // Non-critical — don't block auth
           console.warn("User sync failed:", e);
@@ -120,6 +123,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         // Immediately update local state for snappy UI
         setUser((prev) => (prev ? { ...prev, ...updates } : prev));
+
+        // Sync custom fields to our mongodb backend immediately
+        if (updates.upiId !== undefined || updates.username !== undefined) {
+          const { ApiService } = await import("@/services/ApiService");
+          await ApiService.post("/api/users/sync", {
+            authId: firebaseUser.uid,
+            ...(updates.upiId !== undefined && { upiId: updates.upiId }),
+            ...(updates.username !== undefined && { username: updates.username })
+          });
+        }
       } catch (e: any) {
         setError(e?.message || "Profile update failed");
         throw e;
