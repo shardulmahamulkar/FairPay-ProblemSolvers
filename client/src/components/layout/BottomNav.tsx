@@ -16,8 +16,8 @@ const BottomNav = () => {
 
   return (
     <nav
-      className="fixed bottom-[calc(env(safe-area-inset-bottom,20px)+1rem)] left-1/2 -translate-x-1/2 z-50 flex items-center justify-around w-[calc(100%-2rem)] max-w-[calc(28rem-2rem)] rounded-2xl py-2 px-1 bg-card border"
-      style={{ borderColor: "rgba(15,26,46,0.08)", boxShadow: "0px 12px 30px rgba(15, 26, 46, 0.08)" }}
+      className="fixed bottom-[calc(env(safe-area-inset-bottom,20px)+1rem)] left-1/2 -translate-x-1/2 z-50 flex items-center justify-around w-[calc(100%-2rem)] max-w-[calc(28rem-2rem)] rounded-2xl py-2 px-1"
+      style={{ backgroundColor: "#003F66", boxShadow: "0px 12px 30px rgba(0, 63, 102, 0.25)" }}
     >
       {tabs.map((tab) => {
         const isActive = location.pathname === tab.path || (tab.path !== "/" && location.pathname.startsWith(tab.path));
@@ -30,11 +30,11 @@ const BottomNav = () => {
             <div className="flex flex-col items-center justify-center px-4 py-1.5 rounded-[20px] transition-all duration-300 relative">
               <tab.icon className={cn(
                 "w-5 h-5 transition-colors duration-200",
-                isActive ? "text-[#1E2A44] dark:text-[#F5F2EB]" : "text-[rgba(15,26,46,0.4)] dark:text-[rgba(245,242,235,0.4)]"
+                isActive ? "text-white" : "text-white/50"
               )} />
               <span className={cn(
                 "text-[9px] font-semibold mt-0.5 transition-colors duration-200",
-                isActive ? "text-[#1E2A44] dark:text-[#F5F2EB]" : "text-[rgba(15,26,46,0.4)] dark:text-[rgba(245,242,235,0.4)]"
+                isActive ? "text-white" : "text-white/50"
               )}>
                 {tab.label}
               </span>
