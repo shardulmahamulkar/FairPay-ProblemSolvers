@@ -24,6 +24,7 @@ const SettleHubPage = () => {
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [userAvatars, setUserAvatars] = useState<Record<string, string>>({});
+  const [userUpiIds, setUserUpiIds] = useState<Record<string, string>>({});
   const [expandedPeople, setExpandedPeople] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const { defaultCurrency, formatAmount, convertAmount } = useCurrency();
@@ -54,9 +55,11 @@ const SettleHubPage = () => {
     return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   };
 
-  const buildUpiLink = (amount: number): string => {
+  const buildUpiLink = (upiId: string, payeeName: string, amount: number): string => {
     const positiveAmount = Math.abs(amount).toFixed(2);
-    return `upi://pay?pa=patankarparas%40oksbi&pn=Paras%20Patankar&am=${positiveAmount}&cu=INR&tn=FairPay%20Settlement`;
+    const encodedPa = encodeURIComponent(upiId);
+    const encodedPn = encodeURIComponent(payeeName);
+    return `upi://pay?pa=${encodedPa}&pn=${encodedPn}&am=${positiveAmount}&cu=INR&tn=FairPay%20Settlement`;
   };
 
   const fetchData = async () => {
@@ -113,17 +116,20 @@ const SettleHubPage = () => {
 
       const nameMap: Record<string, string> = {};
       const avatarMap: Record<string, string> = {};
+      const upiIdMap: Record<string, string> = {};
       await Promise.all([...ids].map(async (uid) => {
         try {
           const u: any = await ApiService.get(`/api/users/${uid}`);
           nameMap[uid] = u.username || u.email?.split("@")[0] || uid.substring(0, 8);
           avatarMap[uid] = u.avatar || "";
+          if (u.upiId) upiIdMap[uid] = u.upiId;
         } catch {
           nameMap[uid] = uid.substring(0, 8);
         }
       }));
       setUserNames(nameMap);
       setUserAvatars(avatarMap);
+      setUserUpiIds(upiIdMap);
     } catch (err) {
       console.error(err);
     } finally {
@@ -157,7 +163,14 @@ const SettleHubPage = () => {
     try {
       // Trigger UPI deep link before API call
       if (paymentMethod === "upi") {
-        const upiLink = buildUpiLink(settleTarget.amount);
+        const receiverId = settleTarget.payeeId;
+        const receiverUpiId = userUpiIds[receiverId];
+        if (!receiverUpiId) {
+          toast({ variant: "destructive", title: "UPI ID Missing", description: "Receiver has not set their UPI ID in profile." });
+          return;
+        }
+        const receiverName = getName(receiverId);
+        const upiLink = buildUpiLink(receiverUpiId, receiverName, settleTarget.amount);
         if (isMobileDevice()) {
           window.location.href = upiLink;
         } else {
@@ -232,7 +245,14 @@ const SettleHubPage = () => {
 
       // Trigger UPI deep link before API calls
       if (paymentMethod === "upi") {
-        const upiLink = buildUpiLink(total);
+        const receiverId = settleAllTarget.personId;
+        const receiverUpiId = userUpiIds[receiverId];
+        if (!receiverUpiId) {
+          toast({ variant: "destructive", title: "UPI ID Missing", description: "Receiver has not set their UPI ID in profile." });
+          return;
+        }
+        const receiverName = getName(receiverId);
+        const upiLink = buildUpiLink(receiverUpiId, receiverName, total);
         if (isMobileDevice()) {
           window.location.href = upiLink;
         } else {
@@ -263,6 +283,7 @@ const SettleHubPage = () => {
     const total = group.items.reduce((s, d) => s + d.amount, 0);
     const isExpanded = expandedPeople[group.personId] !== false;
     const avatar = userAvatars[group.personId];
+    const counterpartyHasUpi = !!userUpiIds[group.personId];
 
     return (
       <Card className="rounded-2xl border-0 shadow-sm overflow-hidden">
@@ -454,8 +475,15 @@ const SettleHubPage = () => {
             <Label className="text-xs text-muted-foreground">Select Payment Method</Label>
             <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => setPaymentMethod("upi")}
-                className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${paymentMethod === "upi" ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50 text-muted-foreground"}`}
+                onClick={() => {
+                  const hasUpi = settleTarget && userUpiIds[settleTarget.payeeId];
+                  if (!hasUpi) {
+                    toast({ variant: "destructive", title: "UPI ID Missing", description: "Receiver has not set their UPI ID in profile." });
+                    return;
+                  }
+                  setPaymentMethod("upi");
+                }}
+                className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${paymentMethod === "upi" ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50 text-muted-foreground"} ${!(settleTarget && userUpiIds[settleTarget.payeeId]) && "opacity-50 cursor-not-allowed"}`}
               >
                 <Smartphone className="w-6 h-6" />
                 <span className="text-sm font-medium">UPI</span>
@@ -526,8 +554,15 @@ const SettleHubPage = () => {
             <Label className="text-xs text-muted-foreground">Select Payment Method</Label>
             <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => setPaymentMethod("upi")}
-                className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${paymentMethod === "upi" ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50 text-muted-foreground"}`}
+                onClick={() => {
+                  const hasUpi = settleAllTarget && userUpiIds[settleAllTarget.personId];
+                  if (!hasUpi) {
+                    toast({ variant: "destructive", title: "UPI ID Missing", description: "Receiver has not set their UPI ID in profile." });
+                    return;
+                  }
+                  setPaymentMethod("upi");
+                }}
+                className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${paymentMethod === "upi" ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50 text-muted-foreground"} ${!(settleAllTarget && userUpiIds[settleAllTarget.personId]) && "opacity-50 cursor-not-allowed"}`}
               >
                 <Smartphone className="w-6 h-6" />
                 <span className="text-sm font-medium">UPI</span>
@@ -554,7 +589,7 @@ const SettleHubPage = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Smartphone className="w-5 h-5 text-primary" /> UPI Payment</DialogTitle>
             <DialogDescription>
-              Open on mobile device to complete UPI payment.
+              UPI payments can be completed only on mobile device.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-2">
