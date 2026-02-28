@@ -3,29 +3,16 @@ import { useEffect } from "react";
 import AppHeader from "./AppHeader";
 import BottomNav from "./BottomNav";
 import { SmsService } from "@/services/SmsService";
+import UpiDetectedDialog from "@/components/UpiDetectedDialog";
 
 const AppLayout = () => {
-  const navigate = useNavigate();
-
   useEffect(() => {
-    // Initialize SMS watcher when inside the app
     SmsService.initialize();
 
-    const handleUpiExpense = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      const { amount, note } = customEvent.detail;
-
-      // Navigate to Add Expense screen with prefilled amount and description
-      const searchParams = new URLSearchParams();
-      if (amount) searchParams.set('amount', amount);
-      if (note) searchParams.set('note', note);
-
-      navigate(`/expenses/new?${searchParams.toString()}`);
+    return () => {
+      SmsService.cleanup();
     };
-
-    window.addEventListener('new_upi_expense', handleUpiExpense);
-    return () => window.removeEventListener('new_upi_expense', handleUpiExpense);
-  }, [navigate]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background max-w-md mx-auto relative">
@@ -34,6 +21,7 @@ const AppLayout = () => {
         <Outlet />
       </main>
       <BottomNav />
+      <UpiDetectedDialog />
     </div>
   );
 };

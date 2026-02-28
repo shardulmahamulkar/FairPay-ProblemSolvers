@@ -29,37 +29,7 @@ const queryClient = new QueryClient();
 
 const App = () => {
   useEffect(() => {
-    const handleOTAUpdate = async () => {
-      // Only run this checking logic if we are running natively on a mobile device
-      if (!Capacitor.isNativePlatform()) return;
-
-      try {
-        // Tells the firmware the update didn't crash
-        await CapacitorUpdater.notifyAppReady();
-
-        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
-        // Check our backend for the newest ZIP version
-        const res = await fetch(`${apiUrl}/api/update/check`);
-        const data = await res.json();
-
-        const currentVersion = localStorage.getItem("app_version") || "1.0.0";
-
-        // Download and apply silently in the background if there is a new version
-        if (data.version && data.version !== currentVersion) {
-          const version = await CapacitorUpdater.download({
-            url: data.url,
-            version: data.version,
-          });
-
-          await CapacitorUpdater.set(version);
-          localStorage.setItem("app_version", data.version);
-        }
-      } catch (error) {
-        console.error("OTA Update failed:", error);
-      }
-    };
-
-    handleOTAUpdate();
+    // OTA Update logic removed for local SMS testing
   }, []);
 
   return (
