@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Receipt, Check, Flag, AlertTriangle, Clock } from "lucide-react";
+import { Receipt, Check, Flag, AlertTriangle, Clock, Users } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ const ActivityPage = () => {
   const [groups, setGroups] = useState<any[]>([]);
   const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [selectedExpense, setSelectedExpense] = useState<any | null>(null);
+  const [showSplitsForExpense, setShowSplitsForExpense] = useState<any | null>(null);
 
   const getName = (uid: string) => {
     if (uid === user?.id) return "You";
@@ -43,7 +45,9 @@ const ActivityPage = () => {
       const ids = new Set<string>();
       (allExpenses || []).forEach((e: any) => {
         if (e.paidBy) ids.add(e.paidBy);
+        if (e.userId) ids.add(e.userId);
         e.splits?.forEach((s: any) => ids.add(s.userId));
+        e.participatorsInvolved?.forEach((p: any) => ids.add(p.userId));
       });
 
       const nameMap: Record<string, string> = {};
@@ -52,7 +56,7 @@ const ActivityPage = () => {
           if (uid === user.id) { nameMap[uid] = "You"; return; }
           try {
             const u: any = await ApiService.get(`/api/users/${uid}`);
-            nameMap[uid] = u.username || uid.substring(0, 8);
+            nameMap[uid] = u.displayName || u.username || uid.substring(0, 8);
           } catch { nameMap[uid] = uid.substring(0, 8); }
         })
       );
@@ -166,9 +170,19 @@ const ActivityPage = () => {
                     </p>
                   </div>
                 </div>
-                <p className="text-sm font-semibold text-foreground">
-                  {formatAmount(exp.amount, exp.currency)}
-                </p>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <p className="text-sm font-semibold text-foreground">
+                    {formatAmount(exp.amount, exp.currency)}
+                  </p>
+                  {exp.participatorsInvolved?.length > 0 && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowSplitsForExpense(exp); }}
+                      className="p-1 rounded-full hover:bg-muted"
+                    >
+                      <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                    </button>
+                  )}
+                </div>
               </Card>
             );
           })}
@@ -236,6 +250,41 @@ const ActivityPage = () => {
         onOpenChange={(open) => !open && setSelectedExpense(null)}
         getName={getName}
       />
+
+      {/* Splits Details Dialog */}
+      <Dialog open={!!showSplitsForExpense} onOpenChange={(open) => !open && setShowSplitsForExpense(null)}>
+        <DialogContent className="rounded-2xl max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-primary" /> Split Details
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-2 max-h-60 overflow-y-auto">
+            {showSplitsForExpense?.participatorsInvolved?.map((split: any, idx: number) => {
+              const name = getName(split.userId);
+              return (
+                <div key={idx} className="flex items-center justify-between p-2 rounded-xl border border-border">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                      {name.substring(0, 2).toUpperCase()}
+                    </div>
+                    <span className="text-sm font-medium">{name}</span>
+                  </div>
+                  <span className="text-sm font-semibold">{formatAmount(split.amount, split.currency)}</span>
+                </div>
+              );
+            })}
+            {(!showSplitsForExpense?.participatorsInvolved || showSplitsForExpense.participatorsInvolved.length === 0) && (
+              <p className="text-sm text-muted-foreground text-center">No split information available.</p>
+            )}
+          </div>
+          <DialogFooter className="mt-4">
+            <Button onClick={() => setShowSplitsForExpense(null)} className="rounded-xl w-full">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -721,9 +721,10 @@ const GroupDetailPage = () => {
       const members = (groupRes as any)?.members || [];
       const allUserIds = new Set<string>();
       members.forEach((m: any) => allUserIds.add(m.userId));
-      ((expensesRes as any[]) || []).forEach((e: any) =>
-        allUserIds.add(e.userId),
-      );
+      ((expensesRes as any[]) || []).forEach((e: any) => {
+        allUserIds.add(e.userId);
+        e.participatorsInvolved?.forEach((p: any) => allUserIds.add(p.userId));
+      });
       ((balancesRes as any[]) || []).forEach((b: any) => {
         allUserIds.add(b.payerId);
         allUserIds.add(b.payeeId);
@@ -743,7 +744,7 @@ const GroupDetailPage = () => {
           try {
             const u: any = await ApiService.get(`/api/users/${uid}`);
             nameMap[uid] =
-              u.username || u.email?.split("@")[0] || uid.substring(0, 8);
+              u.displayName || u.username || u.email?.split("@")[0] || uid.substring(0, 8);
             avatarMap[uid] = u.avatar || "";
             if (u.upiId) upiIdMap[uid] = u.upiId;
           } catch {
