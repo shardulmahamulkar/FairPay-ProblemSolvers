@@ -611,6 +611,7 @@ const GroupDetailPage = () => {
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [newBudget, setNewBudget] = useState("");
   const [deleteExpenseId, setDeleteExpenseId] = useState<string | null>(null);
+  const [showSplitsForExpense, setShowSplitsForExpense] = useState<any | null>(null);
   const [editExpense, setEditExpense] = useState<any | null>(null);
   const [editExpenseForm, setEditExpenseForm] = useState({
     expenseNote: "",
@@ -1341,14 +1342,20 @@ const GroupDetailPage = () => {
                   </span>
                   {exp.status !== "settled" && (
                     <button
-                      onClick={() => openEditExpense(exp)}
+                      onClick={(e) => { e.stopPropagation(); openEditExpense(exp); }}
                       className="p-1 rounded-full hover:bg-muted"
                     >
                       <Edit className="w-3.5 h-3.5 text-muted-foreground" />
                     </button>
                   )}
                   <button
-                    onClick={() => setDeleteExpenseId(exp._id)}
+                    onClick={(e) => { e.stopPropagation(); setShowSplitsForExpense(exp); }}
+                    className="p-1 rounded-full hover:bg-muted"
+                  >
+                    <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setDeleteExpenseId(exp._id); }}
                     className="p-1 rounded-full hover:bg-muted"
                   >
                     <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
@@ -2032,6 +2039,41 @@ const GroupDetailPage = () => {
               className="rounded-xl"
             >
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Splits Details Dialog */}
+      <Dialog open={!!showSplitsForExpense} onOpenChange={(open) => !open && setShowSplitsForExpense(null)}>
+        <DialogContent className="rounded-2xl max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-primary" /> Split Details
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-2 max-h-60 overflow-y-auto">
+            {showSplitsForExpense?.participatorsInvolved?.map((split: any, idx: number) => {
+              const name = getName(split.userId);
+              return (
+                <div key={idx} className="flex items-center justify-between p-2 rounded-xl border border-border">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                      {name.substring(0, 2).toUpperCase()}
+                    </div>
+                    <span className="text-sm font-medium">{name}</span>
+                  </div>
+                  <span className="text-sm font-semibold">{formatAmount(split.amount, defaultCurrency)}</span>
+                </div>
+              );
+            })}
+            {(!showSplitsForExpense?.participatorsInvolved || showSplitsForExpense.participatorsInvolved.length === 0) && (
+              <p className="text-sm text-muted-foreground text-center">No split information available.</p>
+            )}
+          </div>
+          <DialogFooter className="mt-4">
+            <Button onClick={() => setShowSplitsForExpense(null)} className="rounded-xl w-full">
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
