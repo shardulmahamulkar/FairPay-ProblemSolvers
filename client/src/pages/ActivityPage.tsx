@@ -28,6 +28,7 @@ const ActivityPage = () => {
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [userNames, setUserNames] = useState<Record<string, string>>({});
+  const [userAvatars, setUserAvatars] = useState<Record<string, string>>({});
   const [selectedExpense, setSelectedExpense] = useState<any | null>(null);
   const [showSplitsForExpense, setShowSplitsForExpense] = useState<any | null>(null);
 
@@ -51,16 +52,26 @@ const ActivityPage = () => {
       });
 
       const nameMap: Record<string, string> = {};
+      const avatarMap: Record<string, string> = {};
       await Promise.all(
         [...ids].map(async (uid) => {
-          if (uid === user.id) { nameMap[uid] = "You"; return; }
+          if (uid === user.id) {
+            nameMap[uid] = "You";
+            avatarMap[uid] = user.avatar || "";
+            return;
+          }
           try {
             const u: any = await ApiService.get(`/api/users/${uid}`);
             nameMap[uid] = u.displayName || u.username || uid.substring(0, 8);
-          } catch { nameMap[uid] = uid.substring(0, 8); }
+            avatarMap[uid] = u.avatar || "";
+          } catch {
+            nameMap[uid] = uid.substring(0, 8);
+            avatarMap[uid] = "";
+          }
         })
       );
       setUserNames(nameMap);
+      setUserAvatars(avatarMap);
     } catch (err) { console.error(err); }
   };
 
@@ -174,7 +185,7 @@ const ActivityPage = () => {
                   <p className="text-sm font-semibold text-foreground">
                     {formatAmount(exp.amount, exp.currency)}
                   </p>
-                  {exp.participatorsInvolved?.length > 0 && (
+                  {(exp.participatorsInvolved?.length > 0 || exp.splits?.length > 0) && (
                     <button
                       onClick={(e) => { e.stopPropagation(); setShowSplitsForExpense(exp); }}
                       className="p-1 rounded-full hover:bg-muted"
@@ -249,6 +260,7 @@ const ActivityPage = () => {
         open={!!selectedExpense}
         onOpenChange={(open) => !open && setSelectedExpense(null)}
         getName={getName}
+        userAvatars={userAvatars}
       />
 
       {/* Splits Details Dialog */}
@@ -260,21 +272,27 @@ const ActivityPage = () => {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 mt-2 max-h-60 overflow-y-auto">
-            {showSplitsForExpense?.participatorsInvolved?.map((split: any, idx: number) => {
+            {(showSplitsForExpense?.participatorsInvolved || showSplitsForExpense?.splits || []).map((split: any, idx: number) => {
               const name = getName(split.userId);
+              const avatar = userAvatars[split.userId];
+              const isImg = avatar?.startsWith("http") || avatar?.startsWith("data:");
               return (
                 <div key={idx} className="flex items-center justify-between p-2 rounded-xl border border-border">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                      {name.substring(0, 2).toUpperCase()}
-                    </div>
+                    {isImg ? (
+                      <img src={avatar} alt={name} className="w-8 h-8 rounded-full object-cover border border-border" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                        {name.substring(0, 2).toUpperCase()}
+                      </div>
+                    )}
                     <span className="text-sm font-medium">{name}</span>
                   </div>
                   <span className="text-sm font-semibold">{formatAmount(split.amount, split.currency)}</span>
                 </div>
               );
             })}
-            {(!showSplitsForExpense?.participatorsInvolved || showSplitsForExpense.participatorsInvolved.length === 0) && (
+            {(!(showSplitsForExpense?.participatorsInvolved || showSplitsForExpense?.splits)?.length) && (
               <p className="text-sm text-muted-foreground text-center">No split information available.</p>
             )}
           </div>

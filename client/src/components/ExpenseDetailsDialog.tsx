@@ -1,17 +1,20 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { getCategoryIcon, getCategoryName, getCategoryColor } from "@/lib/categoryIcons";
 import { getCurrencySymbol } from "@/lib/currency";
-import { Receipt, Calendar, CreditCard, Users, FileText } from "lucide-react";
+import { Receipt, Calendar, CreditCard, Users } from "lucide-react";
 
 interface ExpenseDetailsDialogProps {
     expense: any | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     getName: (userId: string) => string;
+    userAvatars?: Record<string, string>;
 }
 
-export function ExpenseDetailsDialog({ expense, open, onOpenChange, getName }: ExpenseDetailsDialogProps) {
+export function ExpenseDetailsDialog({ expense, open, onOpenChange, getName, userAvatars = {} }: ExpenseDetailsDialogProps) {
     if (!expense) return null;
+
+
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -39,7 +42,7 @@ export function ExpenseDetailsDialog({ expense, open, onOpenChange, getName }: E
                     </div>
                 </div>
 
-                <div className="space-y-4 bg-muted/30 p-4 rounded-xl">
+                <div className="space-y-4 bg-muted/30 p-4 rounded-xl max-h-80 overflow-y-auto">
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
                             <Receipt className="w-4 h-4" />
@@ -49,18 +52,6 @@ export function ExpenseDetailsDialog({ expense, open, onOpenChange, getName }: E
                             <p className="text-sm font-medium">{getCategoryName(expense.category, expense.expenseNote)}</p>
                         </div>
                     </div>
-
-                    {expense.expenseNote && (
-                        <div className="flex items-start gap-3">
-                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary mt-0.5 mt-0">
-                                <FileText className="w-4 h-4" />
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-xs text-muted-foreground">Note</p>
-                                <p className="text-sm font-medium break-words leading-tight">{expense.expenseNote}</p>
-                            </div>
-                        </div>
-                    )}
 
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
@@ -91,6 +82,8 @@ export function ExpenseDetailsDialog({ expense, open, onOpenChange, getName }: E
                             <p className="text-sm font-medium capitalize">{expense.paymentMethod || "UPI"}</p>
                         </div>
                     </div>
+
+
                 </div>
             </DialogContent>
         </Dialog>

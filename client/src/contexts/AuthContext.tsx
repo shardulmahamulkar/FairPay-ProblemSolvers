@@ -70,7 +70,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const authUser = firebaseUserToAuthUser(fbUser);
         setUser(authUser);
 
-        // Sync user to MongoDB for friend lookups
+        // Sync user to MongoDB and restore fields that Firebase Auth can't store
+        // (e.g. base64 avatars are too large for Firebase's photoURL field)
         try {
           const { ApiService } = await import("@/services/ApiService");
           const dbUser = await ApiService.post("/api/users/sync", {
@@ -79,10 +80,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             displayName: authUser.name,
             email: authUser.email,
             phone: authUser.phone,
+            // Only send the Firebase avatar on first sync (don't overwrite a
+            // custom uploaded avatar already saved in MongoDB)
             avatar: authUser.avatar,
-          });
-          if (dbUser && (dbUser as any).upiId) {
-            setUser((prev) => (prev ? { ...prev, upiId: (dbUser as any).upiId } : null));
+          }) as any;
+
+          if (dbUser) {
+            setUser((prev) => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                // Prefer the MongoDB avatar (supports large base64) over the
+                // Firebase photoURL (which has a small size limit)
+                ...(dbUser.avatar && { avatar: dbUser.avatar }),
+                ...(dbUser.upiId && { upiId: dbUser.upiId }),
+              };
+            });
           }
         } catch (e) {
           // Non-critical — don't block auth
@@ -114,7 +127,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const firebaseUpdates: { displayName?: string; photoURL?: string } = {};
         if (updates.name) firebaseUpdates.displayName = updates.name;
-        if (typeof updates.avatar === "string" && (updates.avatar.startsWith("http") || updates.avatar.startsWith("data:")))
+        // Only store http URLs in Firebase photoURL — base64 data URIs are too
+        // large for Firebase and will silently fail or get dropped on reload.
+        // Custom uploaded avatars (data:) are persisted via MongoDB instead.
+        if (typeof updates.avatar === "string" && updates.avatar.startsWith("http"))
           firebaseUpdates.photoURL = updates.avatar;
 
         if (Object.keys(firebaseUpdates).length > 0) {
@@ -124,15 +140,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Immediately update local state for snappy UI
         setUser((prev) => (prev ? { ...prev, ...updates } : prev));
 
-        // Sync custom fields to our mongodb backend immediately
-        if (updates.upiId !== undefined || updates.username !== undefined) {
-          const { ApiService } = await import("@/services/ApiService");
-          await ApiService.post("/api/users/sync", {
-            authId: firebaseUser.uid,
-            ...(updates.upiId !== undefined && { upiId: updates.upiId }),
-            ...(updates.username !== undefined && { username: updates.username })
-          });
-        }
+        // Sync ALL profile fields to MongoDB so they survive page reloads.
+        // This is especially important for avatar (base64 images are stored
+        // here since Firebase Auth photoURL can't hold them).
+        const { ApiService } = await import("@/services/ApiService");
+        await ApiService.post("/api/users/sync", {
+          authId: firebaseUser.uid,
+          ...(updates.name !== undefined && { displayName: updates.name }),
+          ...(updates.username !== undefined && { username: updates.username }),
+          ...(updates.upiId !== undefined && { upiId: updates.upiId }),
+          ...(updates.avatar !== undefined && { avatar: updates.avatar }),
+        });
       } catch (e: any) {
         setError(e?.message || "Profile update failed");
         throw e;

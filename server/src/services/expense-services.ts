@@ -15,6 +15,7 @@ export class ExpenseService {
         currency?: string;
         paymentMethod?: string;
         billPhoto?: string;
+        isPrivate?: boolean;
         participatorsInvolved: { userId: string; splitPercentage?: number; amount: number }[];
     }) {
 
@@ -27,6 +28,7 @@ export class ExpenseService {
             currency: data.currency || "INR",
             paymentMethod: data.paymentMethod,
             billPhoto: data.billPhoto,
+            isPrivate: data.isPrivate || false,
             participatorsInvolved: data.participatorsInvolved.map(p => ({
                 userId: p.userId,
                 splitPercentage: p.splitPercentage,
@@ -112,10 +114,20 @@ export class ExpenseService {
     }
 
     // Get all expenses for a group
-    // Get expenses for a group, indicating if they are settled
-    static async getGroupExpenses(groupId: string) {
-        const expenses = await Expense.find({ groupId }).lean().sort({ expenseTime: -1 });
+    // Get expenses for a group, indicating if they are settled, and filter out private ones
+    static async getGroupExpenses(groupId: string, requestUserId?: string) {
+        let expenses = await Expense.find({ groupId }).lean().sort({ expenseTime: -1 });
         const completedBorrows = await OwedBorrow.find({ groupId, status: "completed" }).lean();
+
+        // 1. Filter out private expenses the user shouldn't see
+        if (requestUserId) {
+            expenses = expenses.filter((exp: any) => {
+                if (!exp.isPrivate) return true;
+                if (exp.userId === requestUserId) return true;
+                if (exp.participatorsInvolved?.some((p: any) => p.userId === requestUserId)) return true;
+                return false; // Private and user is not involved
+            });
+        }
 
         const hasSettled = (u1: string, u2: string) => {
             return completedBorrows.some((b: any) =>
@@ -194,21 +206,21 @@ export class ExpenseService {
         let ci = 0, di = 0;
 
         while (ci < creditors.length && di < debtors.length) {
-            const transferAmount = Math.min(creditors[ci].amount, debtors[di].amount);
+            const transferAmount = Math.min(creditors[ci]!.amount, debtors[di]!.amount);
 
             if (transferAmount > 0.01) {
                 simplified.push({
-                    from: debtors[di].userId,
-                    to: creditors[ci].userId,
+                    from: debtors[di]!.userId,
+                    to: creditors[ci]!.userId,
                     amount: Math.round(transferAmount * 100) / 100,
                 });
             }
 
-            creditors[ci].amount -= transferAmount;
-            debtors[di].amount -= transferAmount;
+            creditors[ci]!.amount -= transferAmount;
+            debtors[di]!.amount -= transferAmount;
 
-            if (creditors[ci].amount < 0.01) ci++;
-            if (debtors[di].amount < 0.01) di++;
+            if (creditors[ci]!.amount < 0.01) ci++;
+            if (debtors[di]!.amount < 0.01) di++;
         }
 
         // 4. Enrich with group name and user info

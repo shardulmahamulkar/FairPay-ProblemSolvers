@@ -60,7 +60,7 @@ const HomePage = () => {
         }
         try {
           const u: any = await ApiService.get(`/api/users/${uid}`);
-          nameMap[uid] = u.username || uid.substring(0, 8);
+          nameMap[uid] = u.displayName || u.username || uid.substring(0, 8);
           avatarMap[uid] = u.avatar || "";
         } catch {
           nameMap[uid] = uid.substring(0, 8);
@@ -128,6 +128,7 @@ const HomePage = () => {
   };
 
   const [selectedExpense, setSelectedExpense] = useState<any | null>(null);
+  const [participantsExpenseId, setParticipantsExpenseId] = useState<string | null>(null);
 
   return (
     <div className="space-y-6 animate-fade-in pt-4">
@@ -269,9 +270,9 @@ const HomePage = () => {
               return (
                 <div key={friend._id} className="flex flex-col items-center gap-1.5 min-w-[64px] flex-shrink-0">
                   {isImg ? (
-                    <img src={friend.avatar} alt={name} className="w-12 h-12 rounded-full object-cover border-2 border-card shadow-sm" />
+                    <img src={friend.avatar} alt={name} className="w-12 h-12 rounded-full object-cover shadow-sm" />
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary border-2 border-card shadow-sm">
+                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary shadow-sm">
                       {name.substring(0, 2).toUpperCase()}
                     </div>
                   )}
@@ -307,30 +308,68 @@ const HomePage = () => {
               const groupName = groups.find(g => g._id === exp.groupId)?.groupName || "Expense";
 
               return (
-                <div
-                  key={exp._id}
-                  onClick={() => setSelectedExpense(exp)}
-                  className={cn(
-                    "flex items-center justify-between py-[18px] cursor-pointer hover:bg-muted/30 transition-colors",
-                    index !== recentExpenses.length - 1 ? "border-b border-border" : ""
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-[34px] h-[34px] rounded-lg flex items-center justify-center flex-shrink-0 p-1.5 ${getCategoryColor(exp.category, exp.expenseNote).bg}`}>
-                      <img
-                        src={getCategoryIcon(exp.category, exp.expenseNote)}
-                        alt={exp.category || "expense"}
-                        className="w-full h-full object-contain filter invert"
-                      />
+                <div key={exp._id}>
+                  <div
+                    onClick={() => setSelectedExpense(exp)}
+                    className={cn(
+                      "flex items-center justify-between py-[18px] cursor-pointer hover:bg-muted/30 transition-colors",
+                      index !== recentExpenses.length - 1 && participantsExpenseId !== exp._id ? "border-b border-border" : ""
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-[34px] h-[34px] rounded-lg flex items-center justify-center flex-shrink-0 p-1.5 ${getCategoryColor(exp.category, exp.expenseNote).bg}`}>
+                        <img
+                          src={getCategoryIcon(exp.category, exp.expenseNote)}
+                          alt={exp.category || "expense"}
+                          className="w-full h-full object-contain filter invert"
+                        />
+                      </div>
+                      <div className="flex flex-col justify-center gap-1 mt-0.5">
+                        <p className="text-[16px] font-medium text-foreground leading-none tracking-tight">{exp.expenseNote || "Transaction"}</p>
+                        <p className="text-[14px] text-muted-foreground leading-none tracking-tight">{groupName}</p>
+                      </div>
                     </div>
-                    <div className="flex flex-col justify-center gap-1 mt-0.5">
-                      <p className="text-[16px] font-medium text-foreground leading-none tracking-tight">{exp.expenseNote || "Transaction"}</p>
-                      <p className="text-[14px] text-muted-foreground leading-none tracking-tight">{groupName}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-[16px] font-semibold text-foreground tracking-tight">
+                        {formatAmount(exp.amount, exp.currency)}
+                      </p>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setParticipantsExpenseId(prev => prev === exp._id ? null : exp._id); }}
+                        className={cn("w-7 h-7 rounded-full flex items-center justify-center transition-colors", participantsExpenseId === exp._id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary")}
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
-                  <p className="text-[16px] font-semibold text-foreground tracking-tight">
-                    {formatAmount(exp.amount, exp.currency)}
-                  </p>
+                  {/* Participants panel */}
+                  {participantsExpenseId === exp._id && (() => {
+                    const splits = exp.participatorsInvolved || exp.splits || [];
+                    return splits.length > 0 ? (
+                      <div className="pb-3 pt-1 border-b border-border">
+                        <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide mb-2">Split between</p>
+                        <div className="flex flex-wrap gap-2">
+                          {splits.map((s: any, i: number) => {
+                            const n = getName(s.userId);
+                            const av = userAvatars[s.userId];
+                            const isImg = av?.startsWith("http") || av?.startsWith("data:");
+                            return (
+                              <div key={i} className="flex items-center gap-1.5 bg-muted/60 rounded-full px-2 py-1">
+                                {isImg ? (
+                                  <img src={av} alt={n} className="w-5 h-5 rounded-full object-cover" />
+                                ) : (
+                                  <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[8px] font-bold text-primary">{n.substring(0, 2).toUpperCase()}</div>
+                                )}
+                                <span className="text-[12px] font-medium text-foreground">{n}</span>
+                                <span className="text-[11px] text-muted-foreground">{getCurrencySymbol(exp.currency)}{s.amount?.toLocaleString()}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground pb-3 border-b border-border">No split info available</p>
+                    );
+                  })()}
                 </div>
               );
             })}
@@ -343,6 +382,7 @@ const HomePage = () => {
         open={!!selectedExpense}
         onOpenChange={(open) => !open && setSelectedExpense(null)}
         getName={getName}
+        userAvatars={userAvatars}
       />
     </div>
   );

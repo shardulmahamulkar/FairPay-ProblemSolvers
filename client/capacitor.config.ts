@@ -8,6 +8,13 @@ const config: CapacitorConfig = {
         CapacitorUpdater: {
             autoUpdate: false,
         },
+        StatusBar: {
+            // Don't overlay the status bar — reserve its space so the header
+            // sits below it. Style is set dynamically from AppHeader.
+            overlaysWebView: false,
+            style: 'DARK',         // default for initial dark-mode launch
+            backgroundColor: '#003F66',
+        },
     }
 };
 

@@ -692,7 +692,7 @@ const GroupDetailPage = () => {
       const [groupRes, statsRes, expensesRes, balancesRes] = await Promise.all([
         ApiService.get(`/api/groups/${id}`),
         ApiService.get(`/api/expenses/stats/${id}`).catch(() => null),
-        ApiService.get(`/api/expenses/group/${id}`).catch(() => []),
+        ApiService.get(`/api/expenses/group/${id}?userId=${user?.id || ""}`).catch(() => []),
         ApiService.get(`/api/expenses/balances/${id}`).catch(() => []),
       ]);
       setGroup(groupRes);
@@ -881,8 +881,8 @@ const GroupDetailPage = () => {
         // 4. Splits Sheet
         const splitsData: any[] = [];
         expenses.forEach(exp => {
-          if (exp.participatorsInvolved && Array.isArray(exp.participatorsInvolved)) {
-            exp.participatorsInvolved.forEach((split: any) => {
+          if ((exp.participatorsInvolved || exp.splits) && Array.isArray((exp.participatorsInvolved || exp.splits))) {
+            (exp.participatorsInvolved || exp.splits).forEach((split: any) => {
               splitsData.push({
                 "Expense Description": exp.expenseNote || "Untitled",
                 "Expense Date": new Date(exp.expenseTime).toLocaleDateString(),
@@ -1398,14 +1398,14 @@ const GroupDetailPage = () => {
             const relevantExpenses = expenses
               .filter((exp: any) => {
                 if (exp.status === "settled" || exp.status === "cleared") return false;
-                const otherInvolved = exp.participatorsInvolved?.some((p: any) => p.userId === otherId);
-                const iAmInvolved = exp.participatorsInvolved?.some((p: any) => p.userId === user?.id);
+                const otherInvolved = (exp.participatorsInvolved || exp.splits)?.some((p: any) => p.userId === otherId);
+                const iAmInvolved = (exp.participatorsInvolved || exp.splits)?.some((p: any) => p.userId === user?.id);
                 return (exp.userId === user?.id && otherInvolved) || (exp.userId === otherId && iAmInvolved);
               })
               .map((exp: any) => {
-                const yourShare = exp.participatorsInvolved?.find((p: any) => p.userId === user?.id)?.amount ?? 0;
-                const theirShare = exp.participatorsInvolved?.find((p: any) => p.userId === otherId)?.amount ?? 0;
-                const weOweForExpense = exp.userId === otherId && (exp.participatorsInvolved?.some((p: any) => p.userId === user?.id) ?? false);
+                const yourShare = (exp.participatorsInvolved || exp.splits)?.find((p: any) => p.userId === user?.id)?.amount ?? 0;
+                const theirShare = (exp.participatorsInvolved || exp.splits)?.find((p: any) => p.userId === otherId)?.amount ?? 0;
+                const weOweForExpense = exp.userId === otherId && ((exp.participatorsInvolved || exp.splits)?.some((p: any) => p.userId === user?.id) ?? false);
                 const splitAmount = weOweForExpense ? yourShare : theirShare;
                 const status = exp.status === "disputed" ? "disputed" : exp.status === "settled" || exp.status === "cleared" ? "settled" : "pending";
                 return { exp, weOweForExpense, splitAmount, yourShare, theirShare, status };
@@ -1691,9 +1691,13 @@ const GroupDetailPage = () => {
                         className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
-                            {getName(g.personId).substring(0, 2).toUpperCase()}
-                          </div>
+                          {(userAvatars[g.personId] && (userAvatars[g.personId].startsWith("http") || userAvatars[g.personId].startsWith("data:"))) ? (
+                            <img src={userAvatars[g.personId]} alt={getName(g.personId)} className="w-9 h-9 rounded-full object-cover" />
+                          ) : (
+                            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                              {getName(g.personId).substring(0, 2).toUpperCase()}
+                            </div>
+                          )}
                           <div className="text-left">
                             <p className="text-sm font-semibold text-foreground">{getName(g.personId)}</p>
                             <p className="text-xs text-muted-foreground">
@@ -2054,21 +2058,27 @@ const GroupDetailPage = () => {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 mt-2 max-h-60 overflow-y-auto">
-            {showSplitsForExpense?.participatorsInvolved?.map((split: any, idx: number) => {
+            {(showSplitsForExpense?.participatorsInvolved || showSplitsForExpense?.splits || []).map((split: any, idx: number) => {
               const name = getName(split.userId);
+              const avatar = userAvatars[split.userId];
+              const isImg = avatar && (avatar.startsWith("http") || avatar.startsWith("data:"));
               return (
                 <div key={idx} className="flex items-center justify-between p-2 rounded-xl border border-border">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                      {name.substring(0, 2).toUpperCase()}
-                    </div>
+                    {isImg ? (
+                      <img src={avatar} alt={name} className="w-8 h-8 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                        {name.substring(0, 2).toUpperCase()}
+                      </div>
+                    )}
                     <span className="text-sm font-medium">{name}</span>
                   </div>
                   <span className="text-sm font-semibold">{formatAmount(split.amount, defaultCurrency)}</span>
                 </div>
               );
             })}
-            {(!showSplitsForExpense?.participatorsInvolved || showSplitsForExpense.participatorsInvolved.length === 0) && (
+            {(!(showSplitsForExpense?.participatorsInvolved || showSplitsForExpense?.splits)?.length) && (
               <p className="text-sm text-muted-foreground text-center">No split information available.</p>
             )}
           </div>
@@ -2342,9 +2352,13 @@ const GroupDetailPage = () => {
                   className="p-3 rounded-xl border-0 shadow-sm flex items-center justify-between"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
-                      {memberName.substring(0, 2).toUpperCase()}
-                    </div>
+                    {(userAvatars[m.userId] && (userAvatars[m.userId].startsWith("http") || userAvatars[m.userId].startsWith("data:"))) ? (
+                      <img src={userAvatars[m.userId]} alt={memberName} className="w-9 h-9 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                        {memberName.substring(0, 2).toUpperCase()}
+                      </div>
+                    )}
                     <div>
                       <p className="text-sm font-medium text-foreground">
                         {memberName}
@@ -2394,6 +2408,7 @@ const GroupDetailPage = () => {
         open={!!selectedExpense}
         onOpenChange={(open) => !open && setSelectedExpense(null)}
         getName={getName}
+        userAvatars={userAvatars}
       />
       {/* UPI Desktop Fallback Dialog */}
       <Dialog open={!!upiDesktopFallback} onOpenChange={() => setUpiDesktopFallback(null)}>
@@ -2435,7 +2450,7 @@ const GroupDetailPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 };
 

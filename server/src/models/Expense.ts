@@ -45,6 +45,10 @@ const expenseSchema = new Schema(
     },
 
     billPhoto: String, // optional
+    isPrivate: {
+      type: Boolean,
+      default: false,
+    },
 
     participatorsInvolved: [participatorSchema], // renamed from splits
 

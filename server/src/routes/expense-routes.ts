@@ -16,7 +16,8 @@ expenseRoutes.post("/", async (req, res) => {
 // Get expenses for a group
 expenseRoutes.get("/group/:groupId", async (req, res) => {
     try {
-        const result = await ExpenseService.getGroupExpenses(req.params.groupId);
+        const userId = req.query.userId as string | undefined;
+        const result = await ExpenseService.getGroupExpenses(req.params.groupId, userId);
         res.json(result);
     } catch (err: any) {
         res.status(400).json({ error: err.message });

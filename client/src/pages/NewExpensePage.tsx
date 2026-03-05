@@ -39,6 +39,7 @@ const NewExpensePage = () => {
     category: "",
     note: initialNote,
     paymentType: "upi",
+    isPrivate: false,
   });
   const [customMode, setCustomMode] = useState<"amount" | "percentage">("amount");
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
@@ -160,6 +161,7 @@ const NewExpensePage = () => {
         currency: form.currency,
         category: form.category || "Other",
         paymentMethod: paymentMethodMap[form.paymentType] || "upi",
+        isPrivate: form.isPrivate,
         participatorsInvolved,
       });
 
@@ -555,7 +557,18 @@ const NewExpensePage = () => {
             <div className="flex justify-between"><span className="text-muted-foreground">Split</span><span className="font-medium text-foreground capitalize">{form.splitType}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Category</span><span className="font-medium text-foreground">{form.category || "—"}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Payment</span><span className="font-medium text-foreground capitalize">{form.paymentType}</span></div>
-            {form.note && <div className="flex justify-between"><span className="text-muted-foreground">Note</span><span className="font-medium text-foreground">{form.note}</span></div>}
+            <div className="flex justify-between items-center py-2 mt-2 border-t border-border/50">
+              <div className="flex flex-col">
+                <span className="font-medium text-foreground">Private Expense</span>
+                <span className="text-xs text-muted-foreground">Hide from members not involved</span>
+              </div>
+              <div
+                className={cn("w-11 h-6 rounded-full transition-colors cursor-pointer relative", form.isPrivate ? "bg-primary" : "bg-muted-foreground")}
+                onClick={() => setForm(prev => ({ ...prev, isPrivate: !prev.isPrivate }))}
+              >
+                <div className={cn("absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform", form.isPrivate ? "translate-x-5" : "translate-x-0")} />
+              </div>
+            </div>
           </div>
           <Button onClick={handleSubmit} className="w-full rounded-xl" disabled={submitting}>
             {submitting ? "Adding..." : "Add Expense"}

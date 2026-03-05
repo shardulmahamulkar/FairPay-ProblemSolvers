@@ -1,6 +1,6 @@
 // ApiService — centralized API calls for backend integration
 // In development, set VITE_API_URL=http://localhost:3000 in client/.env
-const BASE_URL = import.meta.env.VITE_API_URL || "https://fairpay-production.up.railway.app";
+const BASE_URL = import.meta.env.VITE_API_URL || "https://fairpay-serverfairpay-server.onrender.com";
 
 async function handleResponse<T>(res: Response, method: string, endpoint: string): Promise<T> {
   if (!res.ok) {

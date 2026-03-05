@@ -10,18 +10,29 @@ userRoutes.post("/sync", async (req, res) => {
         const { authId, username, email, phone, avatar, displayName, upiId } = req.body;
         if (!authId) return res.status(400).json({ error: "authId is required" });
 
+        // Only update avatar if the incoming value is a real image (http URL or
+        // base64 data URI). If it's initials (e.g. "AB") or empty, preserve
+        // whatever is already stored so custom uploaded photos survive login syncs.
+        const isRealImage = (v: string | undefined) =>
+            v && (v.startsWith("http") || v.startsWith("data:"));
+
+        const setFields: Record<string, any> = {
+            username: username || email?.split("@")[0] || authId.substring(0, 8),
+            displayName: displayName || "",
+            email: email || "",
+            phone: phone || "",
+            ...(upiId !== undefined && { upiId }),
+        };
+
+        if (isRealImage(avatar)) {
+            // Incoming value is a real image — store it (overrides old value)
+            setFields.avatar = avatar;
+        }
+        // else: leave the existing avatar in MongoDB untouched
+
         const user = await User.findOneAndUpdate(
             { authId },
-            {
-                $set: {
-                    username: username || email?.split("@")[0] || authId.substring(0, 8),
-                    displayName: displayName || "",
-                    email: email || "",
-                    phone: phone || "",
-                    avatar: avatar || "",
-                    ...(upiId !== undefined && { upiId }),
-                },
-            },
+            { $set: setFields },
             { upsert: true, new: true }
         );
 
